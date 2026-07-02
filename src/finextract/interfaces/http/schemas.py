@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, Field
@@ -44,3 +45,14 @@ class FinancialStatementResponse(BaseModel):
     currency: str
     accounting_standard: str
     line_items: list[LineItemResponse]
+
+
+class ExtractionSummaryResponse(BaseModel):
+    id: int
+    company_name: str
+    fiscal_year: int
+    period_label: str
+    currency: str
+    accounting_standard: str
+    source_reference: str
+    extracted_at: datetime

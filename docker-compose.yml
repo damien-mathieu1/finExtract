@@ -25,7 +25,26 @@ services:
       - "8000:8000"
     volumes:
       - ./src:/app/src
+      - ./alembic:/app/alembic
       - ./tests/fixtures:/app/fixtures
+    command: >
+      sh -c "uv run alembic upgrade head &&
+             uv run uvicorn finextract.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    environment:
+      API_PROXY_TARGET: http://api:8000
+    depends_on:
+      - api
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
 
 volumes:
   postgres_data:

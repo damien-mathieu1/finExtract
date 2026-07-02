@@ -1,18 +1,23 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Response
+from typing import Annotated
+
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 
 from finextract.export.application.export_statement import ExportStatement
+from finextract.export.domain.ports import ExtractionPersisterPort, ExtractionQueryPort
 from finextract.export.infrastructure.csv_exporter import CsvExporter
 from finextract.export.infrastructure.excel_exporter import ExcelExporter
 from finextract.extraction.domain.ports import FilingDirectoryPort
 from finextract.interfaces.http.schemas import (
     CompanySummaryResponse,
     ExportFormat,
+    ExtractionSummaryResponse,
     FilingSummaryResponse,
     FinancialStatementResponse,
     LineItemResponse,
 )
+from finextract.mapping.application.extract_uploaded_filing import ExtractUploadedFiling
 from finextract.mapping.application.normalize_statement import NormalizeStatement
 from finextract.mapping.domain.models import FinancialStatement
 from finextract.shared_kernel.errors import SourceNotFoundError
@@ -58,29 +63,34 @@ def _export_or_serialize(
 
 
 def build_router(
-    normalize_statement: NormalizeStatement,
     *,
     remote_normalize_statement: NormalizeStatement | None = None,
     filing_directory: FilingDirectoryPort | None = None,
+    extraction_query: ExtractionQueryPort | None = None,
+    extraction_persister: ExtractionPersisterPort | None = None,
+    extract_uploaded_filing: ExtractUploadedFiling | None = None,
 ) -> APIRouter:
     """Composition-root-provided use cases/ports are injected here rather
     than constructed in this module, keeping the HTTP layer free of adapter
     wiring (a driving adapter should only call into application use cases).
 
-    `normalize_statement` drives the local-fixture flow (dev/testing).
     `remote_normalize_statement` + `filing_directory` drive the SEC EDGAR
-    flow (search company -> list filings -> process one); both are optional
-    so the router still works in environments without SEC access configured.
+    flow (search company -> list filings -> process one); `extract_uploaded_filing`
+    drives the user-uploaded-file flow. Both are optional so the router
+    still works in environments without SEC access / persistence configured.
     """
 
-    @router.post("/filings/extract", response_model=None)
-    def extract_filing(
-        company_identifier: str, format: ExportFormat = ExportFormat.JSON
+    @router.post("/filings/upload", response_model=None)
+    async def upload_filing(
+        file: Annotated[UploadFile, File()], format: ExportFormat = ExportFormat.JSON
     ) -> FinancialStatementResponse | Response:
-        try:
-            statement = normalize_statement(company_identifier)
-        except SourceNotFoundError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        if extract_uploaded_filing is None:
+            raise HTTPException(status_code=503, detail="Upload extraction not configured")
+        content = await file.read()
+        filename = file.filename or "upload.xbrl"
+        statement = extract_uploaded_filing(filename, content)
+        if extraction_persister is not None:
+            extraction_persister.persist(statement, f"upload:{filename}")
         return _export_or_serialize(statement, format)
 
     @router.get("/companies/search")
@@ -122,6 +132,39 @@ def build_router(
             statement = remote_normalize_statement(document_url)
         except SourceNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return _export_or_serialize(statement, format)
+
+    @router.get("/extractions")
+    def list_extractions(
+        company_identifier: str | None = None, source_reference: str | None = None
+    ) -> list[ExtractionSummaryResponse]:
+        if extraction_query is None:
+            raise HTTPException(status_code=503, detail="Extraction history not configured")
+        return [
+            ExtractionSummaryResponse(
+                id=e.id,
+                company_name=e.company_name,
+                fiscal_year=e.fiscal_year,
+                period_label=e.period_label,
+                currency=e.currency,
+                accounting_standard=e.accounting_standard,
+                source_reference=e.source_reference,
+                extracted_at=e.extracted_at,
+            )
+            for e in extraction_query.list_extractions(
+                company_identifier=company_identifier, source_reference=source_reference
+            )
+        ]
+
+    @router.get("/extractions/{extraction_id}", response_model=None)
+    def get_extraction(
+        extraction_id: int, format: ExportFormat = ExportFormat.JSON
+    ) -> FinancialStatementResponse | Response:
+        if extraction_query is None:
+            raise HTTPException(status_code=503, detail="Extraction history not configured")
+        statement = extraction_query.get_extraction(extraction_id)
+        if statement is None:
+            raise HTTPException(status_code=404, detail="Extraction not found")
         return _export_or_serialize(statement, format)
 
     return router

@@ -1,0 +1,77 @@
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+  text-align: left;
+}
+
+.app-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.language-switcher select {
+  margin-left: 4px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid #333;
+}
+
+.company-list {
+  list-style: none;
+  padding: 0;
+}
+
+.company-list li {
+  padding: 6px 0;
+}
+
+.error {
+  color: #e5484d;
+}
+
+.export-buttons {
+  display: flex;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.confidence {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+.confidence-neutral {
+  color: #888;
+}
+
+.confidence-ok {
+  background: #1f4d2a;
+  color: #7ee08a;
+}
+
+.confidence-warn {
+  background: #4d3f1f;
+  color: #f0c96b;
+}
+
+.confidence-low {
+  background: #4d1f1f;
+  color: #f08b8b;
+}
+
+.row-low-confidence {
+  outline: 1px solid #4d1f1f;
+}

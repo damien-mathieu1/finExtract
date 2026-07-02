@@ -1,0 +1,62 @@
+{
+  "app": {
+    "title": "FinExtract"
+  },
+  "search": {
+    "placeholder": "Rechercher une entreprise par nom ou symbole",
+    "submit": "Rechercher",
+    "searching": "Recherche…",
+    "uploadPrompt": "Vous avez votre propre fichier XBRL ?",
+    "uploadLinkText": "L'importer",
+    "historyLinkText": "Voir les extractions passées"
+  },
+  "filings": {
+    "title": "Dépôts",
+    "back": "← Retour à la recherche",
+    "loading": "Chargement…",
+    "form": "Formulaire",
+    "filed": "Déposé le",
+    "accession": "N° d'accession",
+    "viewExtracted": "Voir l'extraction",
+    "extract": "Extraire",
+    "extracting": "Extraction…"
+  },
+  "statement": {
+    "loading": "Chargement…"
+  },
+  "upload": {
+    "title": "Importer un dépôt XBRL",
+    "submit": "Importer et extraire",
+    "uploading": "Import en cours…"
+  },
+  "history": {
+    "title": "Extractions passées",
+    "company": "Entreprise",
+    "period": "Période",
+    "standard": "Norme",
+    "source": "Source",
+    "extractedAt": "Extrait le",
+    "empty": "Aucune extraction pour le moment."
+  },
+  "table": {
+    "field": "Champ",
+    "value": "Valeur",
+    "originalLabel": "Libellé d'origine",
+    "source": "Source",
+    "page": "Page",
+    "confidence": "Confiance"
+  },
+  "confidence": {
+    "low": "Faible confiance — vérifier avec la source",
+    "medium": "Confiance moyenne",
+    "high": "Confiance élevée"
+  },
+  "export": {
+    "csv": "Exporter en CSV",
+    "excel": "Exporter en Excel",
+    "failed": "Échec de l'export : {{status}}"
+  },
+  "language": {
+    "label": "Langue"
+  }
+}
