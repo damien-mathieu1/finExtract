@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xbrl xmlns="http://www.xbrl.org/2003/instance"
+      xmlns:us-gaap="http://fasb.org/us-gaap/2023"
+      xmlns:xbrli="http://www.xbrl.org/2003/instance">
+  <xbrli:context id="c1">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sec.gov/CIK">0000000000</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2023-01-01</xbrli:startDate>
+      <xbrli:endDate>2023-12-31</xbrli:endDate>
+    </xbrli:period>
+  </xbrli:context>
+  <us-gaap:Revenues contextRef="c1" unitRef="usd" decimals="0">1000000</us-gaap:Revenues>
+  <us-gaap:NetIncomeLoss contextRef="c1" unitRef="usd" decimals="0">150000</us-gaap:NetIncomeLoss>
+  <us-gaap:Assets contextRef="c1" unitRef="usd" decimals="0">5000000</us-gaap:Assets>
+</xbrl>
