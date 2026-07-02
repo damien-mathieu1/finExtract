@@ -14,8 +14,7 @@ class FilingSourcePort(Protocol):
     downstream (mapping, export) needs no changes to gain a fallback source.
     """
 
-    def fetch_raw_facts(self, source_reference: str) -> RawFiling:
-        ...
+    def fetch_raw_facts(self, source_reference: str) -> RawFiling: ...
 
 
 class FilingDirectoryPort(Protocol):
@@ -24,8 +23,6 @@ class FilingDirectoryPort(Protocol):
     fetching/parsing the chosen filing is a separate step via FilingSourcePort.
     """
 
-    def search_companies(self, query: str) -> list[CompanySummary]:
-        ...
+    def search_companies(self, query: str) -> list[CompanySummary]: ...
 
-    def list_filings(self, cik: str) -> list[FilingSummary]:
-        ...
+    def list_filings(self, cik: str) -> list[FilingSummary]: ...

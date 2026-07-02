@@ -8,5 +8,4 @@ from finextract.mapping.domain.models import FinancialStatement
 class ExportPort(Protocol):
     """Driven port: persist/serialize a FinancialStatement (Load stage)."""
 
-    def export(self, statement: FinancialStatement) -> bytes:
-        ...
+    def export(self, statement: FinancialStatement) -> bytes: ...

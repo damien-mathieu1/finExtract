@@ -54,9 +54,7 @@ class SecEdgarClient:
 
     def list_filings(self, cik: str) -> list[FilingSummary]:
         padded_cik = cik.zfill(10)
-        response = self._client.get(
-            f"https://data.sec.gov/submissions/CIK{padded_cik}.json"
-        )
+        response = self._client.get(f"https://data.sec.gov/submissions/CIK{padded_cik}.json")
         if response.status_code == 404:
             raise SourceNotFoundError(f"No SEC EDGAR company found for CIK '{cik}'")
         response.raise_for_status()
@@ -66,8 +64,11 @@ class SecEdgarClient:
 
         filings = []
         for form, accession, filing_date, primary_document in zip(
-            recent["form"], recent["accessionNumber"], recent["filingDate"],
-            recent["primaryDocument"], strict=True,
+            recent["form"],
+            recent["accessionNumber"],
+            recent["filingDate"],
+            recent["primaryDocument"],
+            strict=True,
         ):
             if form not in XBRL_FORM_TYPES:
                 continue
