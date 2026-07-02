@@ -59,9 +59,13 @@ Dependency management uses [uv](https://docs.astral.sh/uv/).
 ```bash
 cp .env.example .env
 uv sync                 # installs deps + dev group into .venv, from uv.lock
+uv run pre-commit install   # one-time: enables lint/format on every commit
 uv run pytest
 uv run uvicorn finextract.main:app --reload   # local dev, needs FILINGS_DIR set
 ```
+
+Pre-commit hooks (ruff lint + format, whitespace/EOF/yaml/toml checks) run
+automatically on `git commit`. Run them on demand with `uv run pre-commit run --all-files`.
 
 Or via Docker (postgres + api):
 
