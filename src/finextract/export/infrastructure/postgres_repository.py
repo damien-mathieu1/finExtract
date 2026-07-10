@@ -2,7 +2,17 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer, String, create_engine, func
+from sqlalchemy import (
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+    create_engine,
+    func,
+)
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -14,7 +24,12 @@ from sqlalchemy.orm import (
 
 from finextract.export.domain.models import ExtractionSummary
 from finextract.mapping.domain.models import FinancialStatement, LineItem
-from finextract.shared_kernel.value_objects import Currency, FiscalPeriod, ReportingStandard
+from finextract.shared_kernel.value_objects import (
+    Currency,
+    FiscalPeriod,
+    ReportingStandard,
+    StatementCategory,
+)
 
 
 class Base(DeclarativeBase):
@@ -23,16 +38,27 @@ class Base(DeclarativeBase):
 
 class ExtractionRow(Base):
     __tablename__ = "extractions"
+    __table_args__ = (
+        UniqueConstraint(
+            "source_reference",
+            "fiscal_year",
+            "period_label",
+            name="uq_extractions_source_reference_fiscal_year_period_label",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     company_name: Mapped[str] = mapped_column(String(255))
+    cik: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    ticker: Mapped[str | None] = mapped_column(String(20), nullable=True)
     fiscal_year: Mapped[int] = mapped_column(Integer)
     period_start: Mapped[date] = mapped_column(Date)
     period_end: Mapped[date] = mapped_column(Date)
     period_label: Mapped[str] = mapped_column(String(50))
     currency: Mapped[str] = mapped_column(String(3))
     accounting_standard: Mapped[str] = mapped_column(String(50))
-    source_reference: Mapped[str] = mapped_column(String(500), unique=True, index=True)
+    source_reference: Mapped[str] = mapped_column(String(500), index=True)
+    label: Mapped[str | None] = mapped_column(String(255), nullable=True)
     extracted_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     line_items: Mapped[list[LineItemRow]] = relationship(
@@ -46,6 +72,7 @@ class LineItemRow(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     extraction_id: Mapped[int] = mapped_column(ForeignKey("extractions.id", ondelete="CASCADE"))
     field_name: Mapped[str] = mapped_column(String(100))
+    category: Mapped[str] = mapped_column(String(30))
     value: Mapped[float | None] = mapped_column(Float, nullable=True)
     original_label: Mapped[str] = mapped_column(String(255))
     source: Mapped[str] = mapped_column(String(10))
@@ -61,9 +88,11 @@ class PostgresExporter:
     Implements ExportPort (export -> bytes, for parity with the CSV/Excel
     exporters even though the "file" is empty since the load target is the
     database), ExtractionPersisterPort (the actual persistence write, keyed
-    by source_reference so re-extracting a filing upserts instead of
-    duplicating history), and ExtractionQueryPort (list/detail reads for the
-    "what's already been extracted?" frontend flow).
+    by (source_reference, fiscal_year, period_label) so re-extracting the
+    same filing/period upserts instead of duplicating history — a single
+    filing can yield several periods, e.g. comparative fiscal years, each
+    persisted as its own row), and ExtractionQueryPort (list/detail reads
+    for the "what's already been extracted?" frontend flow).
     """
 
     def __init__(self, database_url: str) -> None:
@@ -73,11 +102,23 @@ class PostgresExporter:
     def export(self, statement: FinancialStatement) -> bytes:
         return b""
 
-    def persist(self, statement: FinancialStatement, source_reference: str) -> None:
+    def persist(
+        self,
+        statement: FinancialStatement,
+        source_reference: str,
+        *,
+        cik: str | None = None,
+        ticker: str | None = None,
+        label: str | None = None,
+    ) -> None:
         with self._session_factory() as session:
             existing = (
                 session.query(ExtractionRow)
-                .filter(ExtractionRow.source_reference == source_reference)
+                .filter(
+                    ExtractionRow.source_reference == source_reference,
+                    ExtractionRow.fiscal_year == statement.fiscal_period.fiscal_year,
+                    ExtractionRow.period_label == statement.fiscal_period.period_label,
+                )
                 .one_or_none()
             )
             if existing is None:
@@ -88,6 +129,9 @@ class PostgresExporter:
                 existing.extracted_at = func.now()
 
             existing.company_name = statement.company_name
+            existing.cik = cik
+            existing.ticker = ticker
+            existing.label = label
             existing.fiscal_year = statement.fiscal_period.fiscal_year
             existing.period_start = statement.fiscal_period.start_date
             existing.period_end = statement.fiscal_period.end_date
@@ -97,6 +141,7 @@ class PostgresExporter:
             existing.line_items = [
                 LineItemRow(
                     field_name=li.field_name,
+                    category=li.category.value,
                     value=li.value,
                     original_label=li.original_label,
                     source=li.source,
@@ -130,9 +175,24 @@ class PostgresExporter:
                     accounting_standard=row.accounting_standard,
                     source_reference=row.source_reference,
                     extracted_at=row.extracted_at,
+                    label=row.label,
                 )
                 for row in rows
             ]
+
+    def get_extraction_ids_for_company(
+        self, *, cik: str | None = None, company_name: str | None = None
+    ) -> list[int]:
+        if cik is None and company_name is None:
+            raise ValueError("cik or company_name required")
+        with self._session_factory() as session:
+            query = session.query(ExtractionRow.id)
+            if cik is not None:
+                query = query.filter(ExtractionRow.cik == cik)
+            else:
+                query = query.filter(ExtractionRow.company_name.ilike(f"%{company_name}%"))
+            rows = query.order_by(ExtractionRow.fiscal_year.asc()).all()
+            return [row.id for row in rows]
 
     def get_extraction(self, extraction_id: int) -> FinancialStatement | None:
         with self._session_factory() as session:
@@ -152,6 +212,7 @@ class PostgresExporter:
                 line_items=[
                     LineItem(
                         field_name=li.field_name,
+                        category=StatementCategory(li.category),
                         value=li.value,
                         original_label=li.original_label,
                         source=li.source,

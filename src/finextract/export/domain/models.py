@@ -17,3 +17,4 @@ class ExtractionSummary:
     accounting_standard: str
     source_reference: str
     extracted_at: datetime
+    label: str | None = None

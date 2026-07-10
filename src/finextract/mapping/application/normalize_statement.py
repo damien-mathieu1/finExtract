@@ -18,6 +18,6 @@ class NormalizeStatement:
     source: FilingSourcePort
     mapper: TaxonomyMapperPort
 
-    def __call__(self, company_identifier: str) -> FinancialStatement:
+    def __call__(self, company_identifier: str) -> list[FinancialStatement]:
         raw_filing = self.source.fetch_raw_facts(company_identifier)
         return self.mapper.normalize(raw_filing)

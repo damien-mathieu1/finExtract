@@ -17,8 +17,9 @@ class ExtractFilingRequest(BaseModel):
 
 
 class CompanySummaryResponse(BaseModel):
-    cik: str
+    identifier: str
     name: str
+    source: str
     ticker: str | None
 
 
@@ -31,6 +32,7 @@ class FilingSummaryResponse(BaseModel):
 
 class LineItemResponse(BaseModel):
     field_name: str
+    category: str
     value: float | None
     original_label: str
     source: str
@@ -56,3 +58,4 @@ class ExtractionSummaryResponse(BaseModel):
     accounting_standard: str
     source_reference: str
     extracted_at: datetime
+    label: str | None = None

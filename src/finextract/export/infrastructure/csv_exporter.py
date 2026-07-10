@@ -25,6 +25,7 @@ def statement_to_dataframe(statement: FinancialStatement) -> pd.DataFrame:
             "period_label": statement.fiscal_period.period_label,
             "currency": statement.currency.value,
             "accounting_standard": statement.accounting_standard.value,
+            "category": li.category.value,
             "field_name": li.field_name,
             "value": li.value,
             "original_label": li.original_label,

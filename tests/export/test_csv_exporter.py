@@ -2,7 +2,12 @@ from datetime import date
 
 from finextract.export.infrastructure.csv_exporter import CsvExporter
 from finextract.mapping.domain.models import FinancialStatement, LineItem
-from finextract.shared_kernel.value_objects import Currency, FiscalPeriod, ReportingStandard
+from finextract.shared_kernel.value_objects import (
+    Currency,
+    FiscalPeriod,
+    ReportingStandard,
+    StatementCategory,
+)
 
 
 def test_csv_exporter_produces_header_and_row() -> None:
@@ -17,7 +22,12 @@ def test_csv_exporter_produces_header_and_row() -> None:
         currency=Currency.USD,
         accounting_standard=ReportingStandard.US_GAAP,
         line_items=[
-            LineItem(field_name="revenue", value=1000.0, original_label="us-gaap:Revenues"),
+            LineItem(
+                field_name="revenue",
+                category=StatementCategory.INCOME_STATEMENT,
+                value=1000.0,
+                original_label="us-gaap:Revenues",
+            ),
         ],
     )
 

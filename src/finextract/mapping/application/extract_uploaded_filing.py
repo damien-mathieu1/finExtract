@@ -16,7 +16,7 @@ class ExtractUploadedFiling:
 
     mapper: TaxonomyMapperPort
 
-    def __call__(self, filename: str, content: bytes) -> FinancialStatement:
+    def __call__(self, filename: str, content: bytes) -> list[FinancialStatement]:
         facts = parse_xbrl_facts(content)
         raw_filing = RawFiling(
             company_identifier=filename,

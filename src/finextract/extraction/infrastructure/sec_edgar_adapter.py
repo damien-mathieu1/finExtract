@@ -45,22 +45,23 @@ class SecEdgarClient:
         ]
         return [
             CompanySummary(
-                cik=f"{entry['cik_str']:010d}",
+                identifier=f"{entry['cik_str']:010d}",
                 name=entry["title"],
+                source="sec-edgar",
                 ticker=entry["ticker"],
             )
             for entry in matches[:25]
         ]
 
-    def list_filings(self, cik: str) -> list[FilingSummary]:
-        padded_cik = cik.zfill(10)
+    def list_filings(self, identifier: str) -> list[FilingSummary]:
+        padded_cik = identifier.zfill(10)
         response = self._client.get(f"https://data.sec.gov/submissions/CIK{padded_cik}.json")
         if response.status_code == 404:
-            raise SourceNotFoundError(f"No SEC EDGAR company found for CIK '{cik}'")
+            raise SourceNotFoundError(f"No SEC EDGAR company found for CIK '{identifier}'")
         response.raise_for_status()
 
         recent = response.json()["filings"]["recent"]
-        cik_no_leading_zeros = str(int(cik))
+        cik_no_leading_zeros = str(int(identifier))
 
         filings = []
         for form, accession, filing_date, primary_document in zip(

@@ -10,6 +10,7 @@ class Currency(StrEnum):
     EUR = "EUR"
     GBP = "GBP"
     JPY = "JPY"
+    KRW = "KRW"
 
 
 class ReportingStandard(StrEnum):
@@ -17,6 +18,16 @@ class ReportingStandard(StrEnum):
     US_GAAP = "US_GAAP"
     JAPANESE_GAAP = "JAPANESE_GAAP"
     OTHER = "OTHER"
+
+
+class StatementCategory(StrEnum):
+    """Which of the three standard financial statements a line item belongs
+    to, for grouping in exports/UI (income statement / balance sheet / cash
+    flow statement)."""
+
+    INCOME_STATEMENT = "income_statement"
+    BALANCE_SHEET = "balance_sheet"
+    CASH_FLOW = "cash_flow"
 
 
 @dataclass(frozen=True, slots=True)

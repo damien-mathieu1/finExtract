@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 
 
 @dataclass(frozen=True, slots=True)
@@ -14,6 +15,11 @@ class XbrlFact:
     decimals: int | None = None
     scale: int | None = None  # iXBRL display multiplier: actual = value * 10**scale
     sign: str | None = None  # iXBRL negation marker: "-" means displayed value is negated
+    # Resolved from the filing's <xbrli:context id=context_ref> definition.
+    # Instant periods (balance-sheet facts) are represented as start == end.
+    # None when the context couldn't be found/parsed.
+    period_start: date | None = None
+    period_end: date | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,10 +34,15 @@ class RawFiling:
 
 @dataclass(frozen=True, slots=True)
 class CompanySummary:
-    """A company found via a filing directory search (SEC EDGAR, etc.)."""
+    """A company found via a filing directory search (SEC EDGAR, EDINET,
+    etc). `identifier` is whatever id that source's list_filings expects
+    back (SEC: zero-padded 10-digit CIK; EDINET: E-code; ...). `source` is
+    the short registry key (e.g. "sec-edgar", "edinet") the caller must pass
+    back to disambiguate which adapter to use for the follow-up calls."""
 
-    cik: str  # zero-padded 10-digit, e.g. "0000320193"
+    identifier: str
     name: str
+    source: str
     ticker: str | None = None
 
 

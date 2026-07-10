@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from finextract.shared_kernel.value_objects import Currency, FiscalPeriod, ReportingStandard
+from finextract.shared_kernel.value_objects import (
+    Currency,
+    FiscalPeriod,
+    ReportingStandard,
+    StatementCategory,
+)
 
 
 @dataclass(slots=True)
@@ -10,6 +15,7 @@ class LineItem:
     """One standardized financial figure, traceable back to its source tag."""
 
     field_name: str  # standard schema field, e.g. "revenue", "net_income"
+    category: StatementCategory  # which of the 3 statements this belongs to
     value: float | None
     original_label: str  # source taxonomy tag, e.g. "us-gaap:Revenues"
     source: str = "XBRL"  # "XBRL" | "PDF"

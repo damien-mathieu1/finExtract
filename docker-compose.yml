@@ -40,11 +40,13 @@ services:
     depends_on:
       - api
     ports:
-      - "5173:5173"
+      - "3000:3000"
     volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/index.html:/app/index.html
-      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/app:/app/app
+      - ./frontend/components:/app/components
+      - ./frontend/lib:/app/lib
+      - ./frontend/public:/app/public
+      - ./frontend/next.config.mjs:/app/next.config.mjs
 
 volumes:
   postgres_data:

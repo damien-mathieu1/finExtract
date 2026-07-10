@@ -16,7 +16,8 @@ class PersistAndNormalizeStatement:
     inner: NormalizeStatement
     persister: ExtractionPersisterPort
 
-    def __call__(self, source_reference: str) -> FinancialStatement:
-        statement = self.inner(source_reference)
-        self.persister.persist(statement, source_reference)
-        return statement
+    def __call__(self, source_reference: str) -> list[FinancialStatement]:
+        statements = self.inner(source_reference)
+        for statement in statements:
+            self.persister.persist(statement, source_reference)
+        return statements

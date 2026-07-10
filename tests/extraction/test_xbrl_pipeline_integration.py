@@ -16,7 +16,9 @@ def test_pipeline_end_to_end() -> None:
         mapper=TagTableTaxonomyMapper(),
     )
 
-    statement = normalize_statement("acme")
+    statements = normalize_statement("acme")
+    assert len(statements) == 1
+    statement = statements[0]
     csv_bytes = CsvExporter().export(statement)
 
     assert statement.get("revenue") is not None
