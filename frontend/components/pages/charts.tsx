@@ -19,6 +19,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/lib/i18n'
 import { listExtractions, getExtraction } from '@/lib/api/extractions'
 import type { ExtractionSummaryResponse, FinancialStatementResponse } from '@/lib/api/types'
 import { BarChart2, TrendingUp, Activity, ChevronDown, SlidersHorizontal, X } from 'lucide-react'
@@ -26,10 +27,10 @@ import { BarChart2, TrendingUp, Activity, ChevronDown, SlidersHorizontal, X } fr
 type ChartType = 'bar' | 'line' | 'area'
 type MetricKey = { label: string; xbrlTag: string; sheet: 'is' | 'bs' | 'cf' }
 
-const CHART_TYPES: { id: ChartType; label: string; icon: React.ReactNode }[] = [
-  { id: 'bar', label: 'Bar', icon: <BarChart2 size={14} /> },
-  { id: 'line', label: 'Line', icon: <TrendingUp size={14} /> },
-  { id: 'area', label: 'Area', icon: <Activity size={14} /> },
+const CHART_TYPES: { id: ChartType; labelKey: string; icon: React.ReactNode }[] = [
+  { id: 'bar', labelKey: 'charts.bar', icon: <BarChart2 size={14} /> },
+  { id: 'line', labelKey: 'charts.line', icon: <TrendingUp size={14} /> },
+  { id: 'area', labelKey: 'charts.area', icon: <Activity size={14} /> },
 ]
 
 const CATEGORY_TO_SHEET = { income_statement: 'is', balance_sheet: 'bs', cash_flow: 'cf' } as const
@@ -117,25 +118,26 @@ function ControlsContent({
   selectorOpen: boolean
   setSelectorOpen: (v: boolean) => void
 }) {
+  const { t } = useTranslation()
   return (
     <>
       <div className="p-4 border-b border-border">
         <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
-          Chart Type
+          {t('charts.chartType')}
         </p>
         <div className="flex gap-1">
-          {CHART_TYPES.map((t) => (
+          {CHART_TYPES.map((ct) => (
             <button
-              key={t.id}
-              onClick={() => setChartType(t.id)}
+              key={ct.id}
+              onClick={() => setChartType(ct.id)}
               className={cn(
                 'flex items-center gap-1.5 px-3 py-2 rounded text-xs font-medium transition-colors flex-1 justify-center',
-                chartType === t.id
+                chartType === ct.id
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted text-muted-foreground hover:text-foreground'
               )}
             >
-              {t.icon} {t.label}
+              {ct.icon} {t(ct.labelKey)}
             </button>
           ))}
         </div>
@@ -146,7 +148,7 @@ function ControlsContent({
           className="flex items-center justify-between w-full text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider hover:text-foreground"
           onClick={() => setSelectorOpen(!selectorOpen)}
         >
-          Extractions
+          {t('charts.extractionsLabel')}
           <ChevronDown size={13} className={cn('transition-transform', selectorOpen && 'rotate-180')} />
         </button>
         {selectorOpen && (
@@ -214,12 +216,10 @@ function ControlsContent({
 
       <div className="p-4 flex-1 overflow-y-auto">
         <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
-          Metrics
+          {t('charts.metrics')}
         </p>
         {availableMetrics.length === 0 && (
-          <p className="text-xs text-muted-foreground">
-            Select extractions above to see available metrics
-          </p>
+          <p className="text-xs text-muted-foreground">{t('charts.selectExtractionsHint')}</p>
         )}
         <div className="space-y-1">
           {availableMetrics.map((m, i) => (
@@ -264,6 +264,7 @@ function ControlsContent({
 }
 
 export function ChartsPage() {
+  const { t } = useTranslation()
   const { data: completed = [] } = useQuery({
     queryKey: ['extractions'],
     queryFn: () => listExtractions({}),
@@ -291,7 +292,7 @@ export function ChartsPage() {
   const availableMetrics = useMemo(() => {
     const map = new Map<string, MetricKey>()
     for (const statement of statements) {
-      for (const item of statement.line_items) {
+      for (const item of statement.line_items ?? []) {
         if (!map.has(item.original_label)) {
           map.set(item.original_label, {
             label: item.field_name,
@@ -310,7 +311,7 @@ export function ChartsPage() {
       const point: Record<string, string | number> = { year }
       for (const statement of statements) {
         if (statement.period_label !== year) continue
-        for (const item of statement.line_items) {
+        for (const item of statement.line_items ?? []) {
           if (!selectedMetrics.has(item.original_label) || item.value === null) continue
           const seriesKey = multiCompany
             ? `${statement.company_name} · ${item.field_name}`
@@ -357,7 +358,7 @@ export function ChartsPage() {
     <div className="flex flex-col md:flex-row h-full min-h-0 overflow-hidden">
       <div className="hidden md:flex w-64 shrink-0 border-r border-border flex-col overflow-y-auto">
         <div className="p-4 border-b border-border shrink-0">
-          <h2 className="text-sm font-semibold text-foreground">Chart Settings</h2>
+          <h2 className="text-sm font-semibold text-foreground">{t('charts.chartSettingsTitle')}</h2>
         </div>
         <ControlsContent {...controlsProps} />
       </div>
@@ -366,10 +367,10 @@ export function ChartsPage() {
         <div className="p-4 md:p-6 border-b border-border shrink-0">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="text-lg md:text-xl font-semibold text-foreground">Figures</h1>
+              <h1 className="text-lg md:text-xl font-semibold text-foreground">{t('charts.title')}</h1>
               <p className="text-sm text-muted-foreground mt-0.5 truncate">
                 {selectedIds.length === 0
-                  ? 'Select extractions to visualize'
+                  ? t('charts.selectExtractionsToVisualize')
                   : selectedNames.join(' · ')}
               </p>
             </div>
@@ -380,7 +381,7 @@ export function ChartsPage() {
               onClick={() => setMobileControlsOpen(true)}
             >
               <SlidersHorizontal size={13} />
-              Settings
+              {t('charts.settings')}
               {selectedMetrics.size > 0 && (
                 <span className="ml-0.5 bg-primary/15 text-primary rounded-full px-1 text-[10px] font-medium">
                   {selectedMetrics.size}
@@ -404,8 +405,8 @@ export function ChartsPage() {
             <BarChart2 size={48} className="opacity-15" />
             <p className="text-sm font-medium text-center">
               {selectedIds.length === 0
-                ? 'Tap Settings to select extractions'
-                : 'Select at least one metric in Settings'}
+                ? t('charts.tapSettingsToSelect')
+                : t('charts.selectMetricPrompt')}
             </p>
           </div>
         ) : (
@@ -414,7 +415,7 @@ export function ChartsPage() {
               <h3 className="text-sm font-semibold text-foreground mb-3 md:mb-4 truncate">
                 {selectedMetrics.size === 1
                   ? availableMetrics.find((m) => selectedMetrics.has(m.xbrlTag))?.label
-                  : `${selectedMetrics.size} Metrics Comparison`}
+                  : t('charts.metricsComparison', { count: selectedMetrics.size })}
               </h3>
               <ResponsiveContainer width="100%" height={260}>
                 <ChartComponent data={chartData}>
@@ -531,11 +532,11 @@ export function ChartsPage() {
         )}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-          <h2 className="text-sm font-semibold text-foreground">Chart Settings</h2>
+          <h2 className="text-sm font-semibold text-foreground">{t('charts.chartSettingsTitle')}</h2>
           <button
             onClick={() => setMobileControlsOpen(false)}
             className="p-1.5 rounded-md text-muted-foreground hover:text-foreground"
-            aria-label="Close settings"
+            aria-label={t('common.close')}
           >
             <X size={18} />
           </button>

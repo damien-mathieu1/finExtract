@@ -145,9 +145,17 @@ def build_router(
         ]
 
     @router.get("/companies/{identifier}/filings")
-    def list_filings(identifier: str, source: str = "sec-edgar") -> list[FilingSummaryResponse]:
+    def list_filings(
+        identifier: str, source: str = "sec-edgar", lookback_days: int | None = None
+    ) -> list[FilingSummaryResponse]:
+        """`lookback_days` only affects sources that scan a rolling window
+        (currently EDINET, which has no per-company filing list endpoint);
+        sources with a real per-company endpoint (SEC EDGAR) ignore it and
+        always return full recent history in one call. Pass a larger value
+        to page further back ("load more" in the UI) - already-scanned days
+        are cached, so this only pays for the newly-widened window."""
         try:
-            filings = _get_directory(source).list_filings(identifier)
+            filings = _get_directory(source).list_filings(identifier, lookback_days=lookback_days)
         except SourceNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return [

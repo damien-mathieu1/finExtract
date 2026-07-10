@@ -87,61 +87,72 @@ DEFAULT_TAG_MAP: dict[str, tuple[str, StatementCategory]] = {
     "us-gaap:NetCashProvidedByUsedInFinancingActivities": ("cash_flow_financing", _CF),
 }
 
-# EDINET (Japan) filers tag facts under the jp-gaap taxonomy (or jp-crp for
-# some cover/company-info elements). Consolidated tags are used where a
-# filer reports consolidated statements, which is the common case for the
-# listed companies this adapter targets.
+# EDINET (Japan) filers tag standard consolidated financial statement facts
+# under the jppfs_cor namespace (J-GAAP), the 5-year cover-page summary
+# under jpcrp_cor, and (for the many large-cap filers reporting under IFRS,
+# e.g. Toyota) core P&L/BS facts under jpigp_cor. Revenue under IFRS is
+# frequently tagged with a company-specific extension element rather than a
+# stable jpigp_cor tag (EDINET's IFRS revenue taxonomy is filer-extensible),
+# so it isn't reliably mappable here the way jppfs_cor:NetSales is for
+# J-GAAP filers.
 EDINET_TAG_MAP: dict[str, tuple[str, StatementCategory]] = {
-    # Income statement
-    "jp-gaap:NetSalesSummaryOfBusinessResults": ("revenue", _IS),
-    "jp-gaap:OperatingRevenue1SummaryOfBusinessResults": ("revenue", _IS),
-    "jp-gaap:CostOfSales": ("cost_of_revenue", _IS),
-    "jp-gaap:GrossProfit": ("gross_profit", _IS),
-    "jp-gaap:SellingGeneralAndAdministrativeExpenses": ("sga_expense", _IS),
-    "jp-gaap:OperatingIncome": ("operating_income", _IS),
-    "jp-gaap:OperatingIncomeSummaryOfBusinessResults": ("operating_income", _IS),
-    "jp-gaap:NonOperatingIncome": ("non_operating_income", _IS),
-    "jp-gaap:InterestExpense": ("interest_expense", _IS),
-    "jp-gaap:InterestIncome": ("interest_income", _IS),
-    "jp-gaap:IncomeBeforeIncomeTaxes": ("profit_before_tax", _IS),
-    "jp-gaap:IncomeTaxesCurrentAndDeferred": ("income_tax_expense", _IS),
-    "jp-gaap:ProfitLoss": ("net_income", _IS),
-    "jp-gaap:NetIncomeSummaryOfBusinessResults": ("net_income", _IS),
-    "jp-gaap:BasicEarningsPerShareSummaryOfBusinessResults": ("eps_basic", _IS),
-    "jp-gaap:DilutedEarningsPerShareSummaryOfBusinessResults": ("eps_diluted", _IS),
-    # Balance sheet
-    "jp-gaap:CashAndDeposits": ("cash_and_equivalents", _BS),
-    "jp-gaap:NotesAndAccountsReceivableTrade": ("accounts_receivable", _BS),
-    "jp-gaap:Inventories": ("inventory", _BS),
-    "jp-gaap:CurrentAssets": ("total_current_assets", _BS),
-    "jp-gaap:PropertyPlantAndEquipment": ("net_fixed_assets", _BS),
-    "jp-gaap:InvestmentsAndOtherAssets": ("long_term_investments", _BS),
-    "jp-gaap:Goodwill": ("goodwill", _BS),
-    "jp-gaap:NoncurrentAssets": ("total_non_current_assets", _BS),
-    "jp-gaap:Assets": ("total_assets", _BS),
-    "jp-gaap:AssetsSummaryOfBusinessResults": ("total_assets", _BS),
-    "jp-gaap:NotesAndAccountsPayableTrade": ("accounts_payable", _BS),
-    "jp-gaap:ShortTermLoansPayable": ("short_term_debt", _BS),
-    "jp-gaap:CurrentLiabilities": ("total_current_liabilities", _BS),
-    "jp-gaap:LongTermLoansPayable": ("long_term_debt", _BS),
-    "jp-gaap:NoncurrentLiabilities": ("total_non_current_liabilities", _BS),
-    "jp-gaap:Liabilities": ("total_liabilities", _BS),
-    "jp-gaap:CapitalStock": ("common_stock", _BS),
-    "jp-gaap:CapitalSurplus": ("additional_paid_in_capital", _BS),
-    "jp-gaap:RetainedEarnings": ("retained_earnings", _BS),
-    "jp-gaap:TreasuryStock": ("treasury_stock", _BS),
-    "jp-gaap:NetAssetsSummaryOfBusinessResults": ("total_equity", _BS),
-    "jp-gaap:LiabilitiesAndNetAssets": ("total_liabilities_and_equity", _BS),
-    # Cash flow statement
-    "jp-gaap:DepreciationAndAmortization": ("depreciation_and_amortization", _CF),
-    "jp-gaap:NetCashProvidedByUsedInOperatingActivities": ("cash_flow_operating", _CF),
-    "jp-gaap:PurchaseOfPropertyPlantAndEquipment": ("capex", _CF),
-    "jp-gaap:PurchaseOfBusinessesNetOfCashAcquired": ("acquisitions", _CF),
-    "jp-gaap:NetCashProvidedByUsedInInvestingActivities": ("cash_flow_investing", _CF),
-    "jp-gaap:CashDividendsPaid": ("dividends_paid", _CF),
-    "jp-gaap:ProceedsFromIssuanceOfCommonStock": ("proceeds_from_stock_issuance", _CF),
-    "jp-gaap:PurchaseOfTreasuryStock": ("stock_buybacks", _CF),
-    "jp-gaap:NetCashProvidedByUsedInFinancingActivities": ("cash_flow_financing", _CF),
+    # Income statement (J-GAAP)
+    "jppfs_cor:NetSales": ("revenue", _IS),
+    "jppfs_cor:CostOfSales": ("cost_of_revenue", _IS),
+    "jppfs_cor:GrossProfit": ("gross_profit", _IS),
+    "jppfs_cor:SellingGeneralAndAdministrativeExpenses": ("sga_expense", _IS),
+    "jppfs_cor:OperatingIncome": ("operating_income", _IS),
+    "jppfs_cor:NonOperatingIncome": ("non_operating_income", _IS),
+    "jppfs_cor:InterestExpense": ("interest_expense", _IS),
+    "jppfs_cor:InterestIncome": ("interest_income", _IS),
+    "jppfs_cor:IncomeBeforeIncomeTaxes": ("profit_before_tax", _IS),
+    "jppfs_cor:IncomeTaxesCurrentAndDeferred": ("income_tax_expense", _IS),
+    "jppfs_cor:ProfitLoss": ("net_income", _IS),
+    "jppfs_cor:BasicEarningsPerShare": ("eps_basic", _IS),
+    "jppfs_cor:DilutedEarningsPerShare": ("eps_diluted", _IS),
+    # Income statement (IFRS, e.g. Toyota/Sony-style filers)
+    "jpigp_cor:OperatingProfitLossIFRS": ("operating_income", _IS),
+    "jpigp_cor:ProfitLossBeforeTaxIFRS": ("profit_before_tax", _IS),
+    "jpigp_cor:ProfitLossIFRS": ("net_income", _IS),
+    "jpigp_cor:ProfitLossAttributableToOwnersOfParentIFRS": ("net_income", _IS),
+    # Balance sheet (J-GAAP)
+    "jppfs_cor:CashAndDeposits": ("cash_and_equivalents", _BS),
+    "jppfs_cor:NotesAndAccountsReceivableTrade": ("accounts_receivable", _BS),
+    "jppfs_cor:Inventories": ("inventory", _BS),
+    "jppfs_cor:CurrentAssets": ("total_current_assets", _BS),
+    "jppfs_cor:PropertyPlantAndEquipment": ("net_fixed_assets", _BS),
+    "jppfs_cor:InvestmentsAndOtherAssets": ("long_term_investments", _BS),
+    "jppfs_cor:Goodwill": ("goodwill", _BS),
+    "jppfs_cor:NoncurrentAssets": ("total_non_current_assets", _BS),
+    "jppfs_cor:Assets": ("total_assets", _BS),
+    "jppfs_cor:NotesAndAccountsPayableTrade": ("accounts_payable", _BS),
+    "jppfs_cor:ShortTermLoansPayable": ("short_term_debt", _BS),
+    "jppfs_cor:CurrentLiabilities": ("total_current_liabilities", _BS),
+    "jppfs_cor:LongTermLoansPayable": ("long_term_debt", _BS),
+    "jppfs_cor:NoncurrentLiabilities": ("total_non_current_liabilities", _BS),
+    "jppfs_cor:Liabilities": ("total_liabilities", _BS),
+    "jppfs_cor:CapitalStock": ("common_stock", _BS),
+    "jppfs_cor:CapitalSurplus": ("additional_paid_in_capital", _BS),
+    "jppfs_cor:RetainedEarnings": ("retained_earnings", _BS),
+    "jppfs_cor:TreasuryStock": ("treasury_stock", _BS),
+    "jppfs_cor:NetAssets": ("total_equity", _BS),
+    "jppfs_cor:LiabilitiesAndNetAssets": ("total_liabilities_and_equity", _BS),
+    # Balance sheet (IFRS)
+    "jpigp_cor:AssetsIFRS": ("total_assets", _BS),
+    "jpigp_cor:CurrentAssetsIFRS": ("total_current_assets", _BS),
+    "jpigp_cor:NonCurrentAssetsIFRS": ("total_non_current_assets", _BS),
+    "jpigp_cor:IntangibleAssetsIFRS": ("other_intangible_assets", _BS),
+    "jpigp_cor:DeferredTaxAssetsIFRS": ("deferred_tax_assets", _BS),
+    # Cash flow statement (J-GAAP)
+    "jppfs_cor:DepreciationAndAmortization": ("depreciation_and_amortization", _CF),
+    "jppfs_cor:NetCashProvidedByUsedInOperatingActivities": ("cash_flow_operating", _CF),
+    "jppfs_cor:PurchaseOfPropertyPlantAndEquipment": ("capex", _CF),
+    "jppfs_cor:PurchaseOfBusinessesNetOfCashAcquired": ("acquisitions", _CF),
+    "jppfs_cor:NetCashProvidedByUsedInInvestingActivities": ("cash_flow_investing", _CF),
+    "jppfs_cor:CashDividendsPaid": ("dividends_paid", _CF),
+    "jppfs_cor:ProceedsFromIssuanceOfCommonStock": ("proceeds_from_stock_issuance", _CF),
+    "jppfs_cor:PurchaseOfTreasuryStock": ("stock_buybacks", _CF),
+    "jppfs_cor:NetCashProvidedByUsedInFinancingActivities": ("cash_flow_financing", _CF),
 }
 
 _FULL_YEAR_MIN_DAYS = 350

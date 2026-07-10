@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/lib/i18n'
 import { searchCompanies, listFilings } from '@/lib/api/companies'
 import { processFiling, uploadFiling } from '@/lib/api/extractions'
 import type { CompanySummaryResponse, FilingSummaryResponse } from '@/lib/api/types'
@@ -22,39 +23,24 @@ import type { FilingSource } from '@/lib/types'
 import { toast } from 'sonner'
 import type { AppPage } from '@/components/app-sidebar'
 
-const SOURCE_TABS: {
-  id: FilingSource
-  label: string
-  supported: boolean
-  idLabel: string
-  searchPlaceholder: string
-}[] = [
-  {
-    id: 'sec-edgar',
-    label: 'SEC EDGAR',
-    supported: true,
-    idLabel: 'CIK',
-    searchPlaceholder: 'Company, ticker or CIK…',
-  },
-  {
-    id: 'edinet',
-    label: 'EDINET',
-    supported: true,
-    idLabel: 'EDINET code',
-    searchPlaceholder: 'Company name or ticker…',
-  },
-  { id: 'xbrl-api', label: 'XBRL API', supported: false, idLabel: 'ID', searchPlaceholder: '' },
-  { id: 'upload-xbrl', label: 'XBRL File', supported: true, idLabel: 'ID', searchPlaceholder: '' },
-  { id: 'upload-pdf', label: 'PDF / OCR', supported: false, idLabel: 'ID', searchPlaceholder: '' },
+const SOURCE_TABS: { id: FilingSource; supported: boolean }[] = [
+  { id: 'sec-edgar', supported: true },
+  { id: 'edinet', supported: true },
+  { id: 'xbrl-api', supported: false },
+  { id: 'upload-xbrl', supported: true },
+  { id: 'upload-pdf', supported: false },
 ]
 
 const DIRECTORY_SOURCES: FilingSource[] = ['sec-edgar', 'edinet']
+const DEFAULT_LOOKBACK_DAYS = 120
+const LOOKBACK_STEP_DAYS = 365
 
 interface FilingSearchProps {
   onNavigate: (page: AppPage) => void
 }
 
 export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
 
   const [sourceTab, setSourceTab] = useState<FilingSource>('sec-edgar')
@@ -69,6 +55,7 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
   const [mobileStep, setMobileStep] = useState<0 | 1>(0)
 
   const isDirectorySource = DIRECTORY_SOURCES.includes(sourceTab)
+  const [lookbackDays, setLookbackDays] = useState(DEFAULT_LOOKBACK_DAYS)
 
   const companiesQuery = useQuery({
     queryKey: ['companies', sourceTab, searchedQuery],
@@ -77,8 +64,8 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
   })
 
   const filingsQuery = useQuery({
-    queryKey: ['filings', sourceTab, selectedCompany?.identifier],
-    queryFn: () => listFilings(selectedCompany!.identifier, sourceTab),
+    queryKey: ['filings', sourceTab, selectedCompany?.identifier, lookbackDays],
+    queryFn: () => listFilings(selectedCompany!.identifier, sourceTab, lookbackDays),
     enabled: isDirectorySource && !!selectedCompany,
   })
 
@@ -97,19 +84,22 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
           sourceTab
         )
       }
-      throw new Error('Nothing selected to extract')
+      throw new Error(t('filingSearch.toasts.nothingSelected'))
     },
     onSuccess: async (statements) => {
       await queryClient.invalidateQueries({ queryKey: ['extractions'] })
-      toast.success(`Extraction completed: ${statements.length} fiscal year(s)`, {
-        action: { label: 'View', onClick: () => onNavigate('extractions') },
+      toast.success(t('filingSearch.toasts.extractionCompleted', { count: statements.length }), {
+        action: {
+          label: t('filingSearch.toasts.viewAction'),
+          onClick: () => onNavigate('extractions'),
+        },
       })
       setSelectedFiling(null)
       setUploadedFile(null)
       setMobileStep(0)
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Extraction failed')
+      toast.error(error instanceof Error ? error.message : t('filingSearch.toasts.extractionFailed'))
     },
   })
 
@@ -123,6 +113,7 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
   function handleSelectCompany(company: CompanySummaryResponse) {
     setSelectedCompany(company)
     setSelectedFiling(null)
+    setLookbackDays(DEFAULT_LOOKBACK_DAYS)
   }
 
   function handleSelectFiling(filing: FilingSummaryResponse) {
@@ -141,6 +132,10 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
   const isSearching = companiesQuery.isFetching
   const companies = companiesQuery.data ?? []
   const filings = filingsQuery.data ?? []
+  const idLabel =
+    sourceTab === 'sec-edgar' || sourceTab === 'edinet'
+      ? t(`filingSearch.idLabel.${sourceTab}`)
+      : ''
 
   // ─── Search/Results panel ───────────────────────────────────────────────────
   const SearchPanel = (
@@ -152,10 +147,10 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
       )}
     >
       <div className="p-4 md:p-6 border-b border-border shrink-0">
-        <h1 className="text-lg md:text-xl font-semibold text-foreground">Filing Search</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Search SEC EDGAR / EDINET filings or upload your own XBRL file
-        </p>
+        <h1 className="text-lg md:text-xl font-semibold text-foreground">
+          {t('filingSearch.title')}
+        </h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{t('filingSearch.subtitle')}</p>
       </div>
 
       {/* Source tabs */}
@@ -171,18 +166,15 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
                 : 'text-muted-foreground hover:text-foreground hover:bg-accent'
             )}
           >
-            {tab.label}
+            {t(`filingSearch.tabs.${tab.id}`)}
           </button>
         ))}
       </div>
 
-      {!SOURCE_TABS.find((t) => t.id === sourceTab)?.supported && (
+      {!SOURCE_TABS.find((tab) => tab.id === sourceTab)?.supported && (
         <div className="mx-4 mt-4 flex items-start gap-2 rounded-md bg-warning/10 border border-warning/30 p-3 shrink-0">
           <AlertTriangle size={16} className="text-warning shrink-0 mt-0.5" />
-          <p className="text-xs text-warning leading-relaxed">
-            <span className="font-semibold">Not yet supported</span> by the backend. Try SEC EDGAR
-            or upload an XBRL file instead.
-          </p>
+          <p className="text-xs text-warning leading-relaxed">{t('filingSearch.notSupported')}</p>
         </div>
       )}
 
@@ -201,12 +193,20 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleSearch()
                 }}
-                placeholder={SOURCE_TABS.find((t) => t.id === sourceTab)?.searchPlaceholder}
+                placeholder={t(
+                  sourceTab === 'edinet'
+                    ? 'filingSearch.searchPlaceholderEdinet'
+                    : 'filingSearch.searchPlaceholderSecEdgar'
+                )}
                 className="w-full pl-9 pr-3 py-2.5 text-sm bg-card border border-border rounded-md outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
               />
             </div>
             <Button onClick={handleSearch} disabled={isSearching} size="sm" className="shrink-0">
-              {isSearching ? <Loader2 size={14} className="animate-spin" /> : 'Search'}
+              {isSearching ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                t('filingSearch.searchButton')
+              )}
             </Button>
           </div>
         </div>
@@ -221,9 +221,9 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
           >
             <Upload size={24} className="mx-auto text-muted-foreground mb-2" />
             <p className="text-sm font-medium text-foreground">
-              {uploadedFile ? uploadedFile.name : 'Drop XBRL file here'}
+              {uploadedFile ? uploadedFile.name : t('filingSearch.dropFile')}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">Accepts .xbrl, .xml files</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('filingSearch.acceptsFiles')}</p>
             <input
               ref={fileRef}
               type="file"
@@ -242,7 +242,7 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
           {uploadedFile && (
             <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
               <CheckCircle2 size={13} className="text-success" />
-              File ready to extract
+              {t('filingSearch.fileReady')}
             </div>
           )}
         </div>
@@ -254,18 +254,18 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
           {isSearching && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
               <Loader2 size={16} className="animate-spin" />
-              Searching companies…
+              {t('filingSearch.searchingCompanies')}
             </div>
           )}
           {searchedQuery && !isSearching && companies.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-10">
-              No companies found. Try a different query.
+              {t('filingSearch.noCompaniesFound')}
             </p>
           )}
           {!searchedQuery && !isSearching && (
             <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
               <Search size={32} className="opacity-20" />
-              <p className="text-sm">Enter a company name or ticker to search</p>
+              <p className="text-sm">{t('filingSearch.enterCompanyPrompt')}</p>
             </div>
           )}
           {!selectedCompany &&
@@ -280,7 +280,8 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
                     <span className="text-sm font-semibold text-foreground">{company.ticker}</span>
                   )}
                   <Badge variant="outline" className="text-[10px] py-0 h-4">
-                    {SOURCE_TABS.find((t) => t.id === sourceTab)?.idLabel} {company.identifier}
+                    {t(`filingSearch.idLabel.${company.source}`) || company.source}{' '}
+                    {company.identifier}
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1 truncate">{company.name}</p>
@@ -294,17 +295,17 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-2"
               >
                 <ArrowLeft size={14} />
-                Back to companies
+                {t('filingSearch.backToCompanies')}
               </button>
               {filingsQuery.isFetching && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
                   <Loader2 size={16} className="animate-spin" />
-                  Loading filings…
+                  {t('filingSearch.loadingFilings')}
                 </div>
               )}
               {!filingsQuery.isFetching && filings.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-10">
-                  No filings found for this company.
+                  {t('filingSearch.noFilingsFound')}
                 </p>
               )}
               {filings.map((filing) => (
@@ -326,7 +327,7 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
                         </Badge>
                       </div>
                       <p className="text-[11px] text-muted-foreground/60 mt-0.5">
-                        Filed {filing.filing_date}
+                        {t('filingSearch.filed', { date: filing.filing_date })}
                       </p>
                     </div>
                     {selectedFiling?.accession_number === filing.accession_number && (
@@ -335,6 +336,16 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
                   </div>
                 </button>
               ))}
+              {sourceTab === 'edinet' && !filingsQuery.isFetching && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs"
+                  onClick={() => setLookbackDays((prev) => prev + LOOKBACK_STEP_DAYS)}
+                >
+                  {t('filingSearch.loadMore')}
+                </Button>
+              )}
             </>
           )}
         </div>
@@ -357,9 +368,11 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
       {!canExtract ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground p-8">
           <Search size={40} className="opacity-20" />
-          <p className="text-sm font-medium text-center">Select a filing to extract</p>
+          <p className="text-sm font-medium text-center">
+            {t('filingSearch.extractPanel.selectFilingPrompt')}
+          </p>
           <p className="text-xs text-center opacity-70">
-            Search a filing source or upload a filing, then choose one to proceed
+            {t('filingSearch.extractPanel.selectFilingHint')}
           </p>
         </div>
       ) : (
@@ -370,7 +383,7 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
               className="md:hidden flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-3"
             >
               <ArrowLeft size={14} />
-              Back to results
+              {t('filingSearch.extractPanel.backToResults')}
             </button>
             <div className="flex items-start gap-3">
               <div className="flex-1 min-w-0">
@@ -390,8 +403,11 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1.5">
-                      {SOURCE_TABS.find((t) => t.id === sourceTab)?.idLabel}:{' '}
-                      {selectedCompany.identifier} · Filed: {selectedFiling.filing_date}
+                      {t('filingSearch.extractPanel.filedLabel', {
+                        idLabel,
+                        identifier: selectedCompany.identifier,
+                        date: selectedFiling.filing_date,
+                      })}
                     </p>
                   </>
                 )}
@@ -413,22 +429,21 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
           <div className="flex-1 p-4 md:p-6 space-y-3 overflow-y-auto">
             <div>
               <label className="text-xs font-medium text-muted-foreground" htmlFor="extraction-label">
-                Extraction name
+                {t('filingSearch.extractPanel.extractionNameLabel')}
               </label>
               <input
                 id="extraction-label"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
-                placeholder="e.g. Apple 10-Q Q3 2025"
+                placeholder={t('filingSearch.extractPanel.extractionNamePlaceholder')}
                 className="w-full mt-1 px-3 py-2 text-sm bg-card border border-border rounded-md outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Shown in extraction history instead of the raw document URL.
+                {t('filingSearch.extractPanel.extractionNameHint')}
               </p>
             </div>
             <p className="text-sm text-muted-foreground">
-              All standardized fields (income statement, balance sheet, cash flow) will be
-              extracted. You can filter which rows to display once the data is in.
+              {t('filingSearch.extractPanel.bodyText')}
             </p>
           </div>
 
@@ -444,7 +459,9 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
                 ) : (
                   <Plus size={15} />
                 )}
-                {extractMutation.isPending ? 'Extracting…' : 'Launch Extraction'}
+                {extractMutation.isPending
+                  ? t('filingSearch.extractPanel.extracting')
+                  : t('filingSearch.extractPanel.launchExtraction')}
               </Button>
             </div>
           </div>

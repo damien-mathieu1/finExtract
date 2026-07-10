@@ -53,7 +53,11 @@ class SecEdgarClient:
             for entry in matches[:25]
         ]
 
-    def list_filings(self, identifier: str) -> list[FilingSummary]:
+    def list_filings(
+        self, identifier: str, lookback_days: int | None = None
+    ) -> list[FilingSummary]:
+        # SEC's submissions API always returns full recent filing history in
+        # one call; there's no day-window concept to bound here.
         padded_cik = identifier.zfill(10)
         response = self._client.get(f"https://data.sec.gov/submissions/CIK{padded_cik}.json")
         if response.status_code == 404:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
@@ -23,8 +24,16 @@ XBRL_DOC_TYPE_CODES = {"120", "130", "140", "150"}  # yuho, semi-annual, quarter
 
 # EDINET has no "list filings for this company" endpoint - documents.json is
 # queried per calendar day. list_filings scans back this many days to build
-# a filing history, which bounds both API calls and latency per lookup.
-_LOOKBACK_DAYS = 400
+# a filing history. Default window is deliberately small (most companies
+# file 1-2 XBRL reports within any 4-month span); callers that want older
+# history pass a larger `lookback_days` explicitly ("load more" in the UI).
+_DEFAULT_LOOKBACK_DAYS = 120
+_MAX_LOOKBACK_DAYS = 800
+
+# Day-scan requests are independent and EDINET has no documented rate limit
+# for this endpoint, so fetch them concurrently instead of one-at-a-time -
+# sequential scanning of 400 days took ~5 minutes end to end in testing.
+_DAY_SCAN_WORKERS = 20
 
 
 @dataclass(slots=True)
@@ -41,7 +50,10 @@ class EdinetClient:
       date, not by company, so this scans the last `_LOOKBACK_DAYS` days and
       filters to the given EDINET code's XBRL-bearing filings. Slower than
       SEC's per-company submissions API, but there's no alternative EDINET
-      endpoint.
+      endpoint. Days are fetched concurrently and each day's raw result is
+      cached (dates are immutable once past), so the first lookup pays the
+      full scan cost once and every subsequent lookup - for any company -
+      is served from memory.
     - fetch_raw_facts: downloads the filing's XBRL submission ZIP and parses
       the instance document inside it (EDINET, unlike SEC, serves a ZIP
       package rather than the XBRL/iXBRL document directly).
@@ -50,6 +62,7 @@ class EdinetClient:
     api_key: str
     _client: httpx.Client = field(init=False, repr=False)
     _company_cache: list[dict] | None = field(default=None, init=False, repr=False)
+    _day_docs_cache: dict[str, list[dict]] = field(default_factory=dict, init=False, repr=False)
 
     def __post_init__(self) -> None:
         self._client = httpx.Client(timeout=20.0)
@@ -74,23 +87,18 @@ class EdinetClient:
             for entry in matches[:25]
         ]
 
-    def list_filings(self, identifier: str) -> list[FilingSummary]:
+    def list_filings(
+        self, identifier: str, lookback_days: int | None = None
+    ) -> list[FilingSummary]:
+        days = min(lookback_days or _DEFAULT_LOOKBACK_DAYS, _MAX_LOOKBACK_DAYS)
+        self._ensure_days_cached(days)
+
+        # Filters over the full cache (not just this call's window) since
+        # earlier/larger lookups may have already warmed days beyond it -
+        # no reason to throw that data away.
         filings: list[FilingSummary] = []
-        today = date.today()
-        for offset in range(_LOOKBACK_DAYS):
-            day = today - timedelta(days=offset)
-            response = self._client.get(
-                f"{_API_BASE}/documents.json",
-                params={
-                    "date": day.isoformat(),
-                    "type": 2,
-                    "Subscription-Key": self.api_key,
-                },
-            )
-            if response.status_code == 404:
-                continue
-            response.raise_for_status()
-            for doc in response.json().get("results", []):
+        for day_iso, docs in self._day_docs_cache.items():
+            for doc in docs:
                 if doc.get("edinetCode") != identifier:
                     continue
                 if doc.get("xbrlFlag") != "1":
@@ -101,13 +109,38 @@ class EdinetClient:
                     FilingSummary(
                         accession_number=doc["docID"],
                         form_type=doc.get("docDescription") or doc["docTypeCode"],
-                        filing_date=doc.get("submitDateTime", day.isoformat())[:10],
+                        filing_date=doc.get("submitDateTime", day_iso)[:10],
                         document_url=doc["docID"],
                     )
                 )
         if not filings:
             raise SourceNotFoundError(f"No EDINET filings found for EDINET code '{identifier}'")
         return filings
+
+    def _ensure_days_cached(self, lookback_days: int) -> None:
+        today = date.today()
+        missing_days = [
+            today - timedelta(days=offset)
+            for offset in range(lookback_days)
+            if (today - timedelta(days=offset)).isoformat() not in self._day_docs_cache
+        ]
+        if not missing_days:
+            return
+
+        with ThreadPoolExecutor(max_workers=_DAY_SCAN_WORKERS) as pool:
+            results = pool.map(self._fetch_day_docs, missing_days)
+            for day, docs in zip(missing_days, results, strict=True):
+                self._day_docs_cache[day.isoformat()] = docs
+
+    def _fetch_day_docs(self, day: date) -> list[dict]:
+        response = self._client.get(
+            f"{_API_BASE}/documents.json",
+            params={"date": day.isoformat(), "type": 2, "Subscription-Key": self.api_key},
+        )
+        if response.status_code == 404:
+            return []
+        response.raise_for_status()
+        return response.json().get("results", []) or []
 
     def fetch_raw_facts(self, source_reference: str) -> RawFiling:
         response = self._client.get(

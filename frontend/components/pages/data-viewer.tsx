@@ -6,6 +6,7 @@ import { Download, Eye, ChevronDown, BarChart2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/lib/i18n'
 import { getExtraction, combineExtractions, downloadExport, downloadCombinedExport, listExtractions } from '@/lib/api/extractions'
 import { toExtractionResult } from '@/lib/statement-transform'
 import type { SheetRow } from '@/lib/types'
@@ -19,10 +20,10 @@ interface DataViewerPageProps {
 
 type SheetKey = 'is' | 'bs' | 'cf'
 
-const SHEET_META: Record<SheetKey, { label: string; short: string; color: string; bgColor: string }> = {
-  is: { label: 'Income Statement', short: 'IS', color: 'text-chart-1', bgColor: 'bg-chart-1/10' },
-  bs: { label: 'Balance Sheet', short: 'BS', color: 'text-chart-2', bgColor: 'bg-chart-2/10' },
-  cf: { label: 'Cash Flow', short: 'CF', color: 'text-chart-3', bgColor: 'bg-chart-3/10' },
+const SHEET_META: Record<SheetKey, { color: string; bgColor: string }> = {
+  is: { color: 'text-chart-1', bgColor: 'bg-chart-1/10' },
+  bs: { color: 'text-chart-2', bgColor: 'bg-chart-2/10' },
+  cf: { color: 'text-chart-3', bgColor: 'bg-chart-3/10' },
 }
 
 function formatNum(val: string | number) {
@@ -36,10 +37,11 @@ function formatNum(val: string | number) {
 }
 
 function DataTable({ rows, years }: { rows: SheetRow[]; years: string[] }) {
+  const { t } = useTranslation()
   if (rows.length === 0) {
     return (
       <p className="text-xs text-muted-foreground py-8 text-center">
-        No data for this sheet in the selected extractions.
+        {t('dataViewer.noDataForSheet')}
       </p>
     )
   }
@@ -49,10 +51,10 @@ function DataTable({ rows, years }: { rows: SheetRow[]; years: string[] }) {
         <thead>
           <tr className="border-b border-border">
             <th className="text-left py-2 px-4 md:px-3 font-semibold text-muted-foreground sticky left-0 bg-background z-10 min-w-[140px]">
-              Field
+              {t('dataViewer.field')}
             </th>
             <th className="text-left py-2 px-3 font-mono text-muted-foreground/60 hidden lg:table-cell min-w-[180px]">
-              XBRL Tag
+              {t('dataViewer.xbrlTag')}
             </th>
             {years.map((y) => (
               <th
@@ -103,6 +105,7 @@ function DataTable({ rows, years }: { rows: SheetRow[]; years: string[] }) {
 }
 
 export function DataViewerPage({ selectedExtractionIds, onNavigate }: DataViewerPageProps) {
+  const { t } = useTranslation()
   const [activeSheet, setActiveSheet] = useState<SheetKey>('is')
   const [selectorOpen, setSelectorOpen] = useState(false)
   const [localIds, setLocalIds] = useState<number[]>(selectedExtractionIds)
@@ -131,9 +134,9 @@ export function DataViewerPage({ selectedExtractionIds, onNavigate }: DataViewer
     try {
       if (localIds.length > 1) await downloadCombinedExport(localIds, 'excel')
       else await downloadExport(localIds[0], 'excel')
-      toast.success('XLSX exported successfully')
+      toast.success(t('dataViewer.toasts.exportSuccess'))
     } catch {
-      toast.error('Export failed')
+      toast.error(t('dataViewer.toasts.exportFailed'))
     }
   }
 
@@ -143,13 +146,15 @@ export function DataViewerPage({ selectedExtractionIds, onNavigate }: DataViewer
       <div className="p-4 md:p-6 border-b border-border shrink-0">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-lg md:text-xl font-semibold text-foreground">Data Viewer</h1>
+            <h1 className="text-lg md:text-xl font-semibold text-foreground">
+              {t('dataViewer.title')}
+            </h1>
             <p className="text-sm text-muted-foreground mt-0.5 truncate">
               {localIds.length === 0
-                ? 'No extractions selected'
+                ? t('dataViewer.noExtractionsSelected')
                 : localIds.length === 1
                   ? statements[0]?.company_name
-                  : `${localIds.length} extractions merged`}
+                  : t('dataViewer.extractionsMerged', { count: localIds.length })}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
@@ -160,7 +165,7 @@ export function DataViewerPage({ selectedExtractionIds, onNavigate }: DataViewer
               className="gap-1.5 h-8 text-xs"
             >
               <BarChart2 size={13} />
-              Charts
+              {t('dataViewer.charts')}
             </Button>
             <Button
               size="sm"
@@ -169,7 +174,7 @@ export function DataViewerPage({ selectedExtractionIds, onNavigate }: DataViewer
               className="gap-1.5 h-8 text-xs"
             >
               <Download size={13} />
-              XLSX
+              {t('dataViewer.xlsx')}
             </Button>
           </div>
         </div>
@@ -182,8 +187,8 @@ export function DataViewerPage({ selectedExtractionIds, onNavigate }: DataViewer
           >
             <Eye size={13} />
             {localIds.length === 0
-              ? 'Select extractions to view'
-              : `${localIds.length} extraction(s) selected`}
+              ? t('dataViewer.selectExtractionsToView')
+              : t('dataViewer.extractionsSelectedCount', { count: localIds.length })}
             <ChevronDown
               size={13}
               className={cn('transition-transform', selectorOpen && 'rotate-180')}
@@ -193,7 +198,7 @@ export function DataViewerPage({ selectedExtractionIds, onNavigate }: DataViewer
             <div className="mt-2 border border-border rounded-lg overflow-hidden max-h-52 overflow-y-auto">
               {allExtractions.length === 0 && (
                 <p className="text-xs text-muted-foreground p-3 text-center">
-                  No extractions yet
+                  {t('dataViewer.noExtractionsYet')}
                 </p>
               )}
               {allExtractions.map((ext) => (
@@ -230,10 +235,8 @@ export function DataViewerPage({ selectedExtractionIds, onNavigate }: DataViewer
       {localIds.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground p-6">
           <Eye size={40} className="opacity-20" />
-          <p className="text-sm font-medium">No extractions selected</p>
-          <p className="text-xs opacity-70 text-center">
-            Use the selector above or navigate from Extractions page
-          </p>
+          <p className="text-sm font-medium">{t('dataViewer.noExtractionsSelected')}</p>
+          <p className="text-xs opacity-70 text-center">{t('dataViewer.useSelectorHint')}</p>
         </div>
       ) : (
         <>
@@ -253,8 +256,8 @@ export function DataViewerPage({ selectedExtractionIds, onNavigate }: DataViewer
                         : 'border-transparent text-muted-foreground hover:text-foreground'
                     )}
                   >
-                    <span className="md:hidden">{meta.short}</span>
-                    <span className="hidden md:inline">{meta.label}</span>
+                    <span className="md:hidden">{t(`dataViewer.sheets.${key}.short`)}</span>
+                    <span className="hidden md:inline">{t(`dataViewer.sheets.${key}.label`)}</span>
                     <span
                       className={cn(
                         'text-[10px] md:text-[11px] px-1 md:px-1.5 py-0.5 rounded-full font-medium',

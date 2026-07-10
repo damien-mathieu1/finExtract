@@ -11,6 +11,12 @@ export function searchCompanies(
 export function listFilings(
   identifier: string,
   source: string = 'sec-edgar',
+  lookbackDays?: number,
 ): Promise<FilingSummaryResponse[]> {
-  return get(`/companies/${encodeURIComponent(identifier)}/filings${buildQuery({ source })}`)
+  return get(
+    `/companies/${encodeURIComponent(identifier)}/filings${buildQuery({
+      source,
+      lookback_days: lookbackDays,
+    })}`,
+  )
 }

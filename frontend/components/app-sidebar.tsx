@@ -1,6 +1,8 @@
 'use client'
 
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/lib/i18n'
+import { LanguageSwitcher } from '@/components/language-switcher'
 import {
   Search,
   Database,
@@ -19,37 +21,22 @@ export type ViewerSelection = number[]
 
 interface NavItem {
   id: AppPage
-  label: string
   icon: React.ReactNode
-  description: string
 }
 
 const NAV_ITEMS: NavItem[] = [
-  {
-    id: 'search',
-    label: 'Filing Search',
-    icon: <Search size={18} />,
-    description: 'Search & extract filings',
-  },
-  {
-    id: 'extractions',
-    label: 'Extractions',
-    icon: <Database size={18} />,
-    description: 'History, merge & export',
-  },
-  {
-    id: 'viewer',
-    label: 'Data Viewer',
-    icon: <FileText size={18} />,
-    description: 'IS / BS / CF tables',
-  },
-  {
-    id: 'charts',
-    label: 'Figures',
-    icon: <BarChart2 size={18} />,
-    description: 'Visual analytics',
-  },
+  { id: 'search', icon: <Search size={18} /> },
+  { id: 'extractions', icon: <Database size={18} /> },
+  { id: 'viewer', icon: <FileText size={18} /> },
+  { id: 'charts', icon: <BarChart2 size={18} /> },
 ]
+
+const NAV_KEY: Record<AppPage, string> = {
+  search: 'search',
+  extractions: 'extractions',
+  viewer: 'viewer',
+  charts: 'charts',
+}
 
 interface AppSidebarProps {
   activePage: AppPage
@@ -58,6 +45,7 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ activePage, onNavigate, extractionCount }: AppSidebarProps) {
+  const { t } = useTranslation()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -90,10 +78,10 @@ export function AppSidebar({ activePage, onNavigate, extractionCount }: AppSideb
         {!collapsed && (
           <div>
             <span className="text-sm font-semibold text-sidebar-foreground tracking-tight">
-              FinExtract
+              {t('app.name')}
             </span>
             <p className="text-[10px] text-sidebar-foreground/50 leading-none mt-0.5">
-              XBRL · Financial Data
+              {t('app.tagline')}
             </p>
           </div>
         )}
@@ -101,7 +89,7 @@ export function AppSidebar({ activePage, onNavigate, extractionCount }: AppSideb
         <button
           onClick={() => setMobileOpen(false)}
           className="ml-auto md:hidden p-1 text-sidebar-foreground/50 hover:text-sidebar-foreground"
-          aria-label="Close menu"
+          aria-label={t('sidebar.closeMenu')}
         >
           <X size={18} />
         </button>
@@ -109,39 +97,45 @@ export function AppSidebar({ activePage, onNavigate, extractionCount }: AppSideb
 
       {/* Nav */}
       <nav className="flex-1 py-4 space-y-1 px-2">
-        {NAV_ITEMS.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => handleNavigate(item.id)}
-            className={cn(
-              'w-full flex items-center gap-3 rounded-md px-3 py-3 text-left transition-colors',
-              activePage === item.id
-                ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-              collapsed && 'justify-center px-0'
-            )}
-            title={collapsed ? item.label : undefined}
-          >
-            <span className="shrink-0">{item.icon}</span>
-            {!collapsed && (
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium leading-none">{item.label}</div>
-                <div className="text-[11px] mt-1 opacity-60 truncate">{item.description}</div>
-              </div>
-            )}
-            {!collapsed && item.id === 'extractions' && extractionCount > 0 && (
-              <span className="shrink-0 text-[10px] font-semibold bg-primary/20 text-primary rounded-full px-1.5 py-0.5">
-                {extractionCount}
-              </span>
-            )}
-          </button>
-        ))}
+        {NAV_ITEMS.map((item) => {
+          const label = t(`sidebar.nav.${NAV_KEY[item.id]}.label`)
+          const description = t(`sidebar.nav.${NAV_KEY[item.id]}.description`)
+          return (
+            <button
+              key={item.id}
+              onClick={() => handleNavigate(item.id)}
+              className={cn(
+                'w-full flex items-center gap-3 rounded-md px-3 py-3 text-left transition-colors',
+                activePage === item.id
+                  ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                collapsed && 'justify-center px-0'
+              )}
+              title={collapsed ? label : undefined}
+            >
+              <span className="shrink-0">{item.icon}</span>
+              {!collapsed && (
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium leading-none">{label}</div>
+                  <div className="text-[11px] mt-1 opacity-60 truncate">{description}</div>
+                </div>
+              )}
+              {!collapsed && item.id === 'extractions' && extractionCount > 0 && (
+                <span className="shrink-0 text-[10px] font-semibold bg-primary/20 text-primary rounded-full px-1.5 py-0.5">
+                  {extractionCount}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </nav>
+
+      <LanguageSwitcher collapsed={collapsed} />
 
       {/* Desktop collapse toggle */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="hidden md:flex items-center justify-center h-10 border-t border-sidebar-border text-sidebar-foreground/40 hover:text-sidebar-foreground/80 transition-colors"
+        className="hidden md:flex items-center justify-center h-10 mt-2 border-t border-sidebar-border text-sidebar-foreground/40 hover:text-sidebar-foreground/80 transition-colors"
       >
         {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
       </button>
@@ -157,19 +151,19 @@ export function AppSidebar({ activePage, onNavigate, extractionCount }: AppSideb
             <GitMerge size={14} className="text-primary-foreground" />
           </div>
           <span className="text-sm font-semibold text-sidebar-foreground tracking-tight">
-            FinExtract
+            {t('app.name')}
           </span>
         </div>
         <div className="flex items-center gap-3">
           {extractionCount > 0 && (
             <span className="text-[10px] font-semibold bg-primary/20 text-primary rounded-full px-2 py-0.5">
-              {extractionCount} extractions
+              {t('sidebar.extractionsBadge', { count: extractionCount })}
             </span>
           )}
           <button
             onClick={() => setMobileOpen(true)}
             className="p-1.5 rounded-md text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-            aria-label="Open menu"
+            aria-label={t('sidebar.openMenu')}
           >
             <Menu size={20} />
           </button>

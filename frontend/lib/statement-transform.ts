@@ -15,7 +15,7 @@ export function toSheetRows(
 
   for (const statement of statements) {
     const year = statement.period_label
-    for (const item of statement.line_items) {
+    for (const item of statement.line_items ?? []) {
       if (item.category !== category) continue
       let row = rowsByField.get(item.field_name)
       if (!row) {

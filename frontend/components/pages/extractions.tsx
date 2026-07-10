@@ -6,6 +6,7 @@ import { GitMerge, Download, Eye, Search, CheckCircle2, ChevronRight, ChevronDow
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/lib/i18n'
 import { listExtractions, downloadCombinedExport, downloadExport } from '@/lib/api/extractions'
 import type { ExtractionSummaryResponse } from '@/lib/api/types'
 import { toast } from 'sonner'
@@ -17,6 +18,7 @@ interface ExtractionsPageProps {
 }
 
 export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
+  const { t } = useTranslation()
   const { data: extractions = [] } = useQuery({
     queryKey: ['extractions'],
     queryFn: () => listExtractions({}),
@@ -74,14 +76,14 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
 
   async function handleExportSelected() {
     if (selectedIds.size === 0) {
-      toast.error('Please select extractions to export.')
+      toast.error(t('extractions.toasts.pleaseSelect'))
       return
     }
     try {
       await downloadCombinedExport(Array.from(selectedIds), 'excel')
-      toast.success('XLSX export ready')
+      toast.success(t('extractions.toasts.exportReady'))
     } catch {
-      toast.error('Export failed')
+      toast.error(t('extractions.toasts.exportFailed'))
     }
   }
 
@@ -89,13 +91,13 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
     try {
       await downloadExport(id, 'excel')
     } catch {
-      toast.error('Export failed')
+      toast.error(t('extractions.toasts.exportFailed'))
     }
   }
 
   function handleMergeAndView() {
     if (selectedIds.size < 2) {
-      toast.error('Select at least 2 extractions to merge.')
+      toast.error(t('extractions.toasts.selectAtLeastTwo'))
       return
     }
     onNavigate('viewer', Array.from(selectedIds))
@@ -111,10 +113,16 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
       <div className="p-4 md:p-6 border-b border-border shrink-0">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-lg md:text-xl font-semibold text-foreground">Extractions</h1>
+            <h1 className="text-lg md:text-xl font-semibold text-foreground">
+              {t('extractions.title')}
+            </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {groups.length} filing{groups.length !== 1 ? 's' : ''} ({extractions.length} period
-              {extractions.length !== 1 ? 's' : ''}) · Select to merge, export, or view
+              {t('extractions.countSummary', {
+                filings: groups.length,
+                filingsPlural: groups.length !== 1 ? 's' : '',
+                periods: extractions.length,
+                periodsPlural: extractions.length !== 1 ? 's' : '',
+              })}
             </p>
           </div>
         </div>
@@ -123,7 +131,7 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
         {selectedIds.size > 0 && (
           <div className="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-border/60">
             <span className="text-xs text-muted-foreground font-medium">
-              {selectedIds.size} selected
+              {t('extractions.selected', { count: selectedIds.size })}
             </span>
             {selectedIds.size >= 2 && (
               <Button
@@ -133,12 +141,12 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
                 className="gap-1.5 h-8 text-xs"
               >
                 <GitMerge size={13} />
-                Merge & View
+                {t('extractions.mergeAndView')}
               </Button>
             )}
             <Button size="sm" onClick={handleExportSelected} className="gap-1.5 h-8 text-xs">
               <Download size={13} />
-              Export XLSX
+              {t('extractions.exportXlsx')}
             </Button>
           </div>
         )}
@@ -152,7 +160,7 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Filter extractions…"
+            placeholder={t('extractions.filterPlaceholder')}
             className="w-full pl-9 pr-3 py-2.5 text-sm bg-card border border-border rounded-md outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
           />
         </div>
@@ -165,13 +173,13 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
           className="accent-primary w-3.5 h-3.5"
           checked={filtered.length > 0 && selectedIds.size === filtered.length}
           onChange={toggleAll}
-          aria-label="Select all"
+          aria-label={t('extractions.selectAll')}
         />
-        <span className="flex-1">Company</span>
-        <span className="w-20 text-center">Period</span>
-        <span className="w-24 text-center">Standard</span>
-        <span className="w-24 text-right">Extracted</span>
-        <span className="w-24 text-right">Actions</span>
+        <span className="flex-1">{t('extractions.columns.company')}</span>
+        <span className="w-20 text-center">{t('extractions.columns.period')}</span>
+        <span className="w-24 text-center">{t('extractions.columns.standard')}</span>
+        <span className="w-24 text-right">{t('extractions.columns.extracted')}</span>
+        <span className="w-24 text-right">{t('extractions.columns.actions')}</span>
       </div>
 
       {/* List */}
@@ -179,10 +187,8 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
         {filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
             <GitMerge size={36} className="opacity-20" />
-            <p className="text-sm font-medium">No extractions yet</p>
-            <p className="text-xs opacity-70">
-              Run an extraction from Filing Search to see it here
-            </p>
+            <p className="text-sm font-medium">{t('extractions.noExtractions')}</p>
+            <p className="text-xs opacity-70">{t('extractions.noExtractionsHint')}</p>
           </div>
         )}
 
@@ -212,7 +218,7 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
                         return next
                       })
                     }}
-                    aria-label={`Select all periods for ${group.displayName}`}
+                    aria-label={`${t('extractions.selectAll')}: ${group.displayName}`}
                   />
                   <button
                     onClick={() => toggleExpand(group.key)}
@@ -227,7 +233,7 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
                       {group.displayName}
                     </span>
                     <Badge variant="secondary" className="text-[10px] shrink-0">
-                      {group.items.length} periods
+                      {t('extractions.periodsBadge', { count: group.items.length })}
                     </Badge>
                   </button>
                   {group.items.some((e) => selectedIds.has(e.id)) && (
@@ -238,7 +244,7 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
                       onClick={() => onNavigate('viewer', group.items.map((e) => e.id))}
                     >
                       <GitMerge size={12} />
-                      Merge & View
+                      {t('extractions.mergeAndView')}
                     </Button>
                   )}
                 </div>
@@ -288,7 +294,7 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
                   size="icon"
                   variant="ghost"
                   className="h-7 w-7"
-                  title="View data"
+                  title={t('extractions.viewData')}
                   onClick={() => handleViewSingle(ext.id)}
                 >
                   <Eye size={14} />
@@ -297,7 +303,7 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
                   size="icon"
                   variant="ghost"
                   className="h-7 w-7"
-                  title="Export XLSX"
+                  title={t('extractions.exportXlsx')}
                   onClick={() => handleExportSingle(ext.id)}
                 >
                   <Download size={14} />
@@ -348,7 +354,7 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
                     onClick={() => handleViewSingle(ext.id)}
                   >
                     <Eye size={12} />
-                    View
+                    {t('extractions.view')}
                   </Button>
                   <Button
                     size="sm"
@@ -357,7 +363,7 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
                     onClick={() => handleExportSingle(ext.id)}
                   >
                     <Download size={12} />
-                    XLSX
+                    {t('extractions.xlsx')}
                   </Button>
                 </div>
               </div>

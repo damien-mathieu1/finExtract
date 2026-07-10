@@ -24,10 +24,10 @@ export function post<T>(path: string): Promise<T> {
   return request<T>(path, { method: 'POST' })
 }
 
-export function buildQuery(params: Record<string, string | undefined>): string {
+export function buildQuery(params: Record<string, string | number | undefined>): string {
   const search = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== '') search.set(key, value)
+    if (value !== undefined && value !== '') search.set(key, String(value))
   }
   const qs = search.toString()
   return qs ? `?${qs}` : ''
