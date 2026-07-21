@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  GCP_REGION: europe-west1
+  GCP_REGION: us-central1
 
 permissions:
   contents: read
