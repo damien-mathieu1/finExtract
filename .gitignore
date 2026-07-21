@@ -5,3 +5,16 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 .env
+
+# macOS
+.DS_Store
+
+# OpenTofu / Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log

@@ -74,6 +74,30 @@ docker compose up --build
 # API docs: http://localhost:8000/docs
 ```
 
+## Deployment
+
+Deploys to GCP Cloud Run (api + frontend) via OpenTofu + GitHub Actions.
+Db is [Neon](https://neon.tech) (managed Postgres, autosuspends compute on
+idle but doesn't pause the whole project like Supabase free tier does).
+
+```bash
+cd infra
+cp terraform.tfvars.example terraform.tfvars   # fill in real values
+tofu init
+tofu apply
+```
+
+Then set repo secrets from `tofu output` (`GCP_PROJECT_ID`,
+`GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_DEPLOYER_SA_EMAIL`), mark the two
+GHCR packages public after the first deploy, and every GitHub Release
+publish triggers `.github/workflows/deploy.yml` (build + push images,
+`gcloud run deploy`). Full detail in [`infra/README.md`](infra/README.md).
+
+**Before going live**: set up [GCP budget alerts + budget actions](https://cloud.google.com/billing/docs/how-to/budgets)
+(auto-disable billing past a threshold) — real protection against a runaway
+bill, unlike a limited-balance card which only blocks the charge after the
+fact and can still get the GCP account suspended/flagged.
+
 ## Status
 
 MVP scope: XBRL extraction path only, sourced from local fixtures or live SEC
