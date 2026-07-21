@@ -26,8 +26,9 @@ jobs:
       - id: tags
         run: |
           TAG="${GITHUB_SHA::12}"
-          echo "api_image=${REGISTRY}/${{ github.repository }}-api:${TAG}" >> "$GITHUB_OUTPUT"
-          echo "frontend_image=${REGISTRY}/${{ github.repository }}-frontend:${TAG}" >> "$GITHUB_OUTPUT"
+          REPO="$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+          echo "api_image=${REGISTRY}/${REPO}-api:${TAG}" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=${REGISTRY}/${REPO}-frontend:${TAG}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/login-action@v3
         with:
