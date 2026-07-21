@@ -37,6 +37,12 @@ variable "sec_edgar_user_agent" {
   type        = string
 }
 
+variable "edinet_api_key" {
+  description = "API key for EDINET (Japan) filing endpoints"
+  type        = string
+  sensitive   = true
+}
+
 variable "database_url" {
   description = "Neon Postgres connection string (postgresql+psycopg://...)"
   type        = string
