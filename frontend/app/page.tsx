@@ -1,5 +1,6 @@
 'use client'
 
+import { Show } from '@clerk/nextjs'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AppSidebar, type AppPage } from '@/components/app-sidebar'
@@ -7,10 +8,13 @@ import { FilingSearchPage } from '@/components/pages/filing-search'
 import { ExtractionsPage } from '@/components/pages/extractions'
 import { DataViewerPage } from '@/components/pages/data-viewer'
 import { ChartsPage } from '@/components/pages/charts'
+import { LandingPage } from '@/components/pages/landing'
 import { listExtractions } from '@/lib/api/extractions'
 import { Toaster } from '@/components/ui/sonner'
 
-export default function Page() {
+// The app lives in its own component so its queries only mount for
+// signed-in users; signed-out visitors get the public landing page.
+function AppShell() {
   const [activePage, setActivePage] = useState<AppPage>('search')
   const [viewerIds, setViewerIds] = useState<number[]>([])
   const { data: extractions = [] } = useQuery({
@@ -42,5 +46,18 @@ export default function Page() {
       </main>
       <Toaster position="bottom-center" />
     </div>
+  )
+}
+
+export default function Page() {
+  return (
+    <>
+      <Show when="signed-out">
+        <LandingPage />
+      </Show>
+      <Show when="signed-in">
+        <AppShell />
+      </Show>
+    </>
   )
 }

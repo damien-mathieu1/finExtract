@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile
 
 from finextract.export.application.export_combined_statements import ExportCombinedStatements
 from finextract.export.application.export_statement import ExportStatement
@@ -78,11 +80,13 @@ def _export_or_serialize_many(
 
 def build_router(
     *,
+    verify_user: Callable[[Request], str],
     remote_normalize_statements: dict[str, NormalizeStatement] | None = None,
     filing_directories: dict[str, FilingDirectoryPort] | None = None,
     extraction_query: ExtractionQueryPort | None = None,
     extraction_persister: ExtractionPersisterPort | None = None,
     extract_uploaded_filing: ExtractUploadedFiling | None = None,
+    daily_extraction_quota: int = 20,
 ) -> APIRouter:
     """Composition-root-provided use cases/ports are injected here rather
     than constructed in this module, keeping the HTTP layer free of adapter
@@ -97,9 +101,35 @@ def build_router(
     configured. A filing can yield several FinancialStatements (one per
     comparative fiscal year/period found), so extraction endpoints return
     lists.
+
+    `verify_user` authenticates every request (the API URL is public) and
+    returns the caller's user id; extractions are persisted and read scoped
+    to that id. `daily_extraction_quota` caps how many extraction rows a
+    user can create per UTC day (one filing typically yields 2-3 rows for
+    comparative fiscal years).
     """
     directories = filing_directories or {}
     normalizers = remote_normalize_statements or {}
+
+    # `user_id: str = Depends(verify_user)` (default-value style) rather than
+    # an Annotated alias: with `from __future__ import annotations` a local
+    # alias becomes an unresolvable ForwardRef at schema-generation time.
+    def _enforce_quota(user_id: str) -> None:
+        if extraction_query is None:
+            return
+        # extracted_at is timezone-naive server time; assumes the DB runs UTC.
+        day_start = datetime.now(UTC).replace(
+            hour=0, minute=0, second=0, microsecond=0, tzinfo=None
+        )
+        used = extraction_query.count_extractions_since(owner_id=user_id, since=day_start)
+        if used >= daily_extraction_quota:
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    f"Daily extraction quota reached ({daily_extraction_quota}/day). "
+                    "Try again tomorrow."
+                ),
+            )
 
     def _get_directory(source: str) -> FilingDirectoryPort:
         directory = directories.get(source)
@@ -116,27 +146,31 @@ def build_router(
     @router.post("/filings/upload", response_model=None)
     async def upload_filing(
         file: Annotated[UploadFile, File()],
+        user_id: str = Depends(verify_user),
         format: ExportFormat = ExportFormat.JSON,
         label: str | None = None,
     ) -> list[FinancialStatementResponse] | Response:
         if extract_uploaded_filing is None:
             raise HTTPException(status_code=503, detail="Upload extraction not configured")
+        _enforce_quota(user_id)
         content = await file.read()
         filename = file.filename or "upload.xbrl"
         statements = extract_uploaded_filing(filename, content)
         if extraction_persister is not None:
             for statement in statements:
                 extraction_persister.persist(
-                    statement, f"upload:{filename}", label=label or filename
+                    statement, f"upload:{filename}", owner_id=user_id, label=label or filename
                 )
         return _export_or_serialize_many(statements, format)
 
     @router.get("/sources")
-    def list_sources() -> list[str]:
+    def list_sources(user_id: str = Depends(verify_user)) -> list[str]:
         return sorted(set(directories) | set(normalizers))
 
     @router.get("/companies/search")
-    def search_companies(q: str, source: str = "sec-edgar") -> list[CompanySummaryResponse]:
+    def search_companies(
+        q: str, user_id: str = Depends(verify_user), source: str = "sec-edgar"
+    ) -> list[CompanySummaryResponse]:
         return [
             CompanySummaryResponse(
                 identifier=c.identifier, name=c.name, source=c.source, ticker=c.ticker
@@ -146,7 +180,10 @@ def build_router(
 
     @router.get("/companies/{identifier}/filings")
     def list_filings(
-        identifier: str, source: str = "sec-edgar", lookback_days: int | None = None
+        identifier: str,
+        user_id: str = Depends(verify_user),
+        source: str = "sec-edgar",
+        lookback_days: int | None = None,
     ) -> list[FilingSummaryResponse]:
         """`lookback_days` only affects sources that scan a rolling window
         (currently EDINET, which has no per-company filing list endpoint);
@@ -171,6 +208,7 @@ def build_router(
     @router.post("/filings/process", response_model=None)
     def process_filing(
         document_url: str,
+        user_id: str = Depends(verify_user),
         source: str = "sec-edgar",
         cik: str | None = None,
         ticker: str | None = None,
@@ -187,6 +225,7 @@ def build_router(
         data it already has (company + form_type + filing_date), stored so
         the extraction history doesn't have to show the raw XBRL
         document_url."""
+        _enforce_quota(user_id)
         try:
             statements = _get_normalizer(source)(document_url)
         except SourceNotFoundError as exc:
@@ -194,13 +233,15 @@ def build_router(
         if extraction_persister is not None:
             for statement in statements:
                 extraction_persister.persist(
-                    statement, document_url, cik=cik, ticker=ticker, label=label
+                    statement, document_url, owner_id=user_id, cik=cik, ticker=ticker, label=label
                 )
         return _export_or_serialize_many(statements, format)
 
     @router.get("/extractions")
     def list_extractions(
-        company_identifier: str | None = None, source_reference: str | None = None
+        user_id: str = Depends(verify_user),
+        company_identifier: str | None = None,
+        source_reference: str | None = None,
     ) -> list[ExtractionSummaryResponse]:
         if extraction_query is None:
             raise HTTPException(status_code=503, detail="Extraction history not configured")
@@ -217,12 +258,15 @@ def build_router(
                 label=e.label,
             )
             for e in extraction_query.list_extractions(
-                company_identifier=company_identifier, source_reference=source_reference
+                owner_id=user_id,
+                company_identifier=company_identifier,
+                source_reference=source_reference,
             )
         ]
 
     @router.get("/extractions/combine", response_model=None)
     def combine_extractions(
+        user_id: str = Depends(verify_user),
         ids: Annotated[list[int] | None, Query()] = None,
         cik: str | None = None,
         company_name: str | None = None,
@@ -236,13 +280,13 @@ def build_router(
         resolved_ids = ids or []
         if not resolved_ids and (cik or company_name):
             resolved_ids = extraction_query.get_extraction_ids_for_company(
-                cik=cik, company_name=company_name
+                owner_id=user_id, cik=cik, company_name=company_name
             )
             if not resolved_ids:
                 raise HTTPException(status_code=404, detail="No extractions found for company")
         statements = []
         for extraction_id in resolved_ids:
-            statement = extraction_query.get_extraction(extraction_id)
+            statement = extraction_query.get_extraction(extraction_id, owner_id=user_id)
             if statement is None:
                 raise HTTPException(status_code=404, detail=f"Extraction {extraction_id} not found")
             statements.append(statement)
@@ -250,11 +294,13 @@ def build_router(
 
     @router.get("/extractions/{extraction_id}", response_model=None)
     def get_extraction(
-        extraction_id: int, format: ExportFormat = ExportFormat.JSON
+        extraction_id: int,
+        user_id: str = Depends(verify_user),
+        format: ExportFormat = ExportFormat.JSON,
     ) -> FinancialStatementResponse | Response:
         if extraction_query is None:
             raise HTTPException(status_code=503, detail="Extraction history not configured")
-        statement = extraction_query.get_extraction(extraction_id)
+        statement = extraction_query.get_extraction(extraction_id, owner_id=user_id)
         if statement is None:
             raise HTTPException(status_code=404, detail="Extraction not found")
         return _export_or_serialize(statement, format)

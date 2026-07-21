@@ -1,5 +1,6 @@
 'use client'
 
+import { UserButton } from '@clerk/nextjs'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
 import { LanguageSwitcher } from '@/components/language-switcher'
@@ -131,6 +132,10 @@ export function AppSidebar({ activePage, onNavigate, extractionCount }: AppSideb
       </nav>
 
       <LanguageSwitcher collapsed={collapsed} />
+
+      <div className={cn('flex items-center px-3 py-2', collapsed && 'justify-center px-0')}>
+        <UserButton />
+      </div>
 
       {/* Desktop collapse toggle */}
       <button

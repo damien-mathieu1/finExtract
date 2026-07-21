@@ -55,6 +55,21 @@ resource "google_secret_manager_secret_version" "sec_edgar_user_agent" {
   secret_data = var.sec_edgar_user_agent
 }
 
+resource "google_secret_manager_secret" "clerk_secret_key" {
+  secret_id = "${var.app_name}-clerk-secret-key"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.secretmanager]
+}
+
+resource "google_secret_manager_secret_version" "clerk_secret_key" {
+  secret      = google_secret_manager_secret.clerk_secret_key.id
+  secret_data = var.clerk_secret_key
+}
+
 # --- runtime service account for the Cloud Run services ---
 
 resource "google_service_account" "run_sa" {
@@ -74,6 +89,12 @@ resource "google_secret_manager_secret_iam_member" "run_sa_sec_edgar_user_agent"
   member    = "serviceAccount:${google_service_account.run_sa.email}"
 }
 
+resource "google_secret_manager_secret_iam_member" "run_sa_clerk_secret_key" {
+  secret_id = google_secret_manager_secret.clerk_secret_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.run_sa.email}"
+}
+
 # --- api service ---
 
 resource "google_cloud_run_v2_service" "api" {
@@ -84,6 +105,11 @@ resource "google_cloud_run_v2_service" "api" {
 
   template {
     service_account = google_service_account.run_sa.email
+
+    # Hard cap on scale-out = hard cap on worst-case bill.
+    scaling {
+      max_instance_count = 2
+    }
 
     containers {
       image = var.api_image
@@ -116,6 +142,21 @@ resource "google_cloud_run_v2_service" "api" {
           }
         }
       }
+
+      env {
+        name  = "CLERK_ISSUER"
+        value = var.clerk_issuer
+      }
+
+      env {
+        name  = "CLERK_AUTHORIZED_PARTIES"
+        value = var.clerk_authorized_parties
+      }
+
+      env {
+        name  = "DAILY_EXTRACTION_QUOTA"
+        value = var.daily_extraction_quota
+      }
     }
   }
 
@@ -144,6 +185,11 @@ resource "google_cloud_run_v2_service" "frontend" {
   template {
     service_account = google_service_account.run_sa.email
 
+    # Hard cap on scale-out = hard cap on worst-case bill.
+    scaling {
+      max_instance_count = 2
+    }
+
     containers {
       image = var.frontend_image
 
@@ -154,6 +200,26 @@ resource "google_cloud_run_v2_service" "frontend" {
       env {
         name  = "API_PROXY_TARGET"
         value = google_cloud_run_v2_service.api.uri
+      }
+
+      env {
+        name = "CLERK_SECRET_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.clerk_secret_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name  = "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+        value = var.clerk_publishable_key
+      }
+
+      env {
+        name  = "NEXT_PUBLIC_CLERK_SIGN_IN_URL"
+        value = "/sign-in"
       }
     }
   }

@@ -1,3 +1,5 @@
+import { getAuthToken } from './auth-token'
+
 export class ApiError extends Error {
   status: number
 
@@ -7,9 +9,20 @@ export class ApiError extends Error {
   }
 }
 
+export async function authHeaders(): Promise<Record<string, string>> {
+  const token = await getAuthToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, init)
+  const res = await fetch(`/api${path}`, {
+    ...init,
+    headers: { ...(await authHeaders()), ...init?.headers },
+  })
   if (!res.ok) {
+    if (res.status === 401) {
+      window.location.assign('/sign-in')
+    }
     const detail = await res.json().catch(() => null)
     throw new ApiError(res.status, detail?.detail ?? res.statusText)
   }

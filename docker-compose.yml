@@ -35,6 +35,7 @@ services:
     build:
       context: ./frontend
       target: dev
+    env_file: .env
     environment:
       API_PROXY_TARGET: http://api:8000
     depends_on:

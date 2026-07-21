@@ -1,4 +1,4 @@
-import { buildQuery, get, post } from './client'
+import { authHeaders, buildQuery, get, post } from './client'
 import type { ExportFormat, ExtractionSummaryResponse, FinancialStatementResponse } from './types'
 
 export function processFiling(
@@ -31,6 +31,9 @@ export async function uploadFiling(
   const res = await fetch(`/api/filings/upload${buildQuery({ format, label })}`, {
     method: 'POST',
     body: form,
+    // Authorization only: Content-Type must stay unset so the browser
+    // generates the multipart boundary.
+    headers: await authHeaders(),
   })
   if (!res.ok) {
     const detail = await res.json().catch(() => null)
@@ -81,7 +84,9 @@ export function combineByCompany(params: {
 }
 
 export async function downloadExport(id: number, format: 'csv' | 'excel'): Promise<void> {
-  const res = await fetch(`/api/extractions/${id}${buildQuery({ format })}`)
+  const res = await fetch(`/api/extractions/${id}${buildQuery({ format })}`, {
+    headers: await authHeaders(),
+  })
   if (!res.ok) throw new Error(`Export failed: ${res.status}`)
   await triggerDownload(res, format)
 }
@@ -90,7 +95,9 @@ export async function downloadCombinedExport(
   ids: number[],
   format: 'csv' | 'excel',
 ): Promise<void> {
-  const res = await fetch(`/api/extractions/combine${combineQuery(ids, format)}`)
+  const res = await fetch(`/api/extractions/combine${combineQuery(ids, format)}`, {
+    headers: await authHeaders(),
+  })
   if (!res.ok) throw new Error(`Export failed: ${res.status}`)
   await triggerDownload(res, format)
 }
@@ -99,7 +106,9 @@ export async function downloadCombinedByCompanyExport(
   params: { cik?: string; companyName?: string },
   format: 'csv' | 'excel',
 ): Promise<void> {
-  const res = await fetch(`/api/extractions/combine${combineByCompanyQuery(params, format)}`)
+  const res = await fetch(`/api/extractions/combine${combineByCompanyQuery(params, format)}`, {
+    headers: await authHeaders(),
+  })
   if (!res.ok) throw new Error(`Export failed: ${res.status}`)
   await triggerDownload(res, format)
 }

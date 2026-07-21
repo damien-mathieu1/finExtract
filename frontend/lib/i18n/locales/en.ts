@@ -115,6 +115,51 @@ const en = {
     selectExtractionsToVisualize: 'Select extractions to visualize',
     metricsComparison: '{{count}} Metrics Comparison',
   },
+  landing: {
+    nav: {
+      signIn: 'Sign in',
+    },
+    hero: {
+      badge: 'XBRL · SEC EDGAR · EDINET',
+      title: 'Financial statements from official filings, without the manual work',
+      subtitle:
+        'FinExtract pulls XBRL data straight from SEC EDGAR (United States) and EDINET (Japan), normalizes it into comparable income statements, balance sheets and cash flows, and exports everything to Excel or CSV.',
+      cta: 'Sign in with Google',
+      ctaHint: 'Free — Google account required',
+    },
+    features: {
+      title: 'What it does',
+      sources: {
+        title: 'Official sources',
+        description:
+          'Search companies and browse their filings directly from SEC EDGAR and EDINET — 10-K, 10-Q, annual securities reports.',
+      },
+      extraction: {
+        title: 'One-click extraction',
+        description:
+          'Pick a filing and FinExtract parses the underlying XBRL: income statement, balance sheet and cash flow, across every fiscal year in the document.',
+      },
+      normalization: {
+        title: 'Normalized & comparable',
+        description:
+          'Line items are mapped to a common taxonomy across US GAAP and Japanese GAAP, so filings from both markets line up side by side.',
+      },
+      export: {
+        title: 'Export & visualize',
+        description:
+          'Merge multiple years, chart key metrics, and export clean CSV or Excel files ready for your own models.',
+      },
+    },
+    about: {
+      title: 'About this project',
+      body: 'FinExtract was built by Damien MATHIEU during a research internship at the School of Engineering, Tohoku University (Sendai, Japan).',
+      goal: 'Its goal is to make cross-market financial statement analysis accessible: extracting and normalizing official filings from both the American and Japanese regulators so they can be compared in one place.',
+    },
+    footer: {
+      credit: '© {{year}} Damien MATHIEU — School of Engineering, Tohoku University',
+      sources: 'Data: SEC EDGAR · EDINET',
+    },
+  },
   dataViewer: {
     title: 'Data Viewer',
     noExtractionsSelected: 'No extractions selected',

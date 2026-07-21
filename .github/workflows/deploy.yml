@@ -54,6 +54,8 @@ jobs:
           target: prod
           push: true
           tags: ${{ steps.tags.outputs.frontend_image }}
+          build-args: |
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 

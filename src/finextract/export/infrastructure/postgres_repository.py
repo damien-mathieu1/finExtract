@@ -40,14 +40,16 @@ class ExtractionRow(Base):
     __tablename__ = "extractions"
     __table_args__ = (
         UniqueConstraint(
+            "owner_id",
             "source_reference",
             "fiscal_year",
             "period_label",
-            name="uq_extractions_source_reference_fiscal_year_period_label",
+            name="uq_extractions_owner_source_fy_period",
         ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_id: Mapped[str] = mapped_column(String(64), index=True)
     company_name: Mapped[str] = mapped_column(String(255))
     cik: Mapped[str | None] = mapped_column(String(20), nullable=True)
     ticker: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -88,11 +90,13 @@ class PostgresExporter:
     Implements ExportPort (export -> bytes, for parity with the CSV/Excel
     exporters even though the "file" is empty since the load target is the
     database), ExtractionPersisterPort (the actual persistence write, keyed
-    by (source_reference, fiscal_year, period_label) so re-extracting the
-    same filing/period upserts instead of duplicating history — a single
-    filing can yield several periods, e.g. comparative fiscal years, each
-    persisted as its own row), and ExtractionQueryPort (list/detail reads
-    for the "what's already been extracted?" frontend flow).
+    by (owner_id, source_reference, fiscal_year, period_label) so a user
+    re-extracting the same filing/period upserts instead of duplicating
+    history while two users can keep separate rows for the same filing — a
+    single filing can yield several periods, e.g. comparative fiscal years,
+    each persisted as its own row), and ExtractionQueryPort (owner-scoped
+    list/detail reads for the "what's already been extracted?" frontend
+    flow).
     """
 
     def __init__(self, database_url: str) -> None:
@@ -107,6 +111,7 @@ class PostgresExporter:
         statement: FinancialStatement,
         source_reference: str,
         *,
+        owner_id: str,
         cik: str | None = None,
         ticker: str | None = None,
         label: str | None = None,
@@ -115,6 +120,7 @@ class PostgresExporter:
             existing = (
                 session.query(ExtractionRow)
                 .filter(
+                    ExtractionRow.owner_id == owner_id,
                     ExtractionRow.source_reference == source_reference,
                     ExtractionRow.fiscal_year == statement.fiscal_period.fiscal_year,
                     ExtractionRow.period_label == statement.fiscal_period.period_label,
@@ -122,7 +128,7 @@ class PostgresExporter:
                 .one_or_none()
             )
             if existing is None:
-                existing = ExtractionRow(source_reference=source_reference)
+                existing = ExtractionRow(owner_id=owner_id, source_reference=source_reference)
                 session.add(existing)
             else:
                 existing.line_items.clear()
@@ -153,10 +159,14 @@ class PostgresExporter:
             session.commit()
 
     def list_extractions(
-        self, *, company_identifier: str | None = None, source_reference: str | None = None
+        self,
+        *,
+        owner_id: str,
+        company_identifier: str | None = None,
+        source_reference: str | None = None,
     ) -> list[ExtractionSummary]:
         with self._session_factory() as session:
-            query = session.query(ExtractionRow)
+            query = session.query(ExtractionRow).filter(ExtractionRow.owner_id == owner_id)
             if source_reference is not None:
                 query = query.filter(ExtractionRow.source_reference == source_reference)
             if company_identifier is not None:
@@ -181,12 +191,12 @@ class PostgresExporter:
             ]
 
     def get_extraction_ids_for_company(
-        self, *, cik: str | None = None, company_name: str | None = None
+        self, *, owner_id: str, cik: str | None = None, company_name: str | None = None
     ) -> list[int]:
         if cik is None and company_name is None:
             raise ValueError("cik or company_name required")
         with self._session_factory() as session:
-            query = session.query(ExtractionRow.id)
+            query = session.query(ExtractionRow.id).filter(ExtractionRow.owner_id == owner_id)
             if cik is not None:
                 query = query.filter(ExtractionRow.cik == cik)
             else:
@@ -194,10 +204,22 @@ class PostgresExporter:
             rows = query.order_by(ExtractionRow.fiscal_year.asc()).all()
             return [row.id for row in rows]
 
-    def get_extraction(self, extraction_id: int) -> FinancialStatement | None:
+    def count_extractions_since(self, *, owner_id: str, since: datetime) -> int:
+        with self._session_factory() as session:
+            return (
+                session.query(func.count(ExtractionRow.id))
+                .filter(
+                    ExtractionRow.owner_id == owner_id,
+                    ExtractionRow.extracted_at >= since,
+                )
+                .scalar()
+                or 0
+            )
+
+    def get_extraction(self, extraction_id: int, *, owner_id: str) -> FinancialStatement | None:
         with self._session_factory() as session:
             row = session.get(ExtractionRow, extraction_id)
-            if row is None:
+            if row is None or row.owner_id != owner_id:
                 return None
             return FinancialStatement(
                 company_name=row.company_name,

@@ -120,6 +120,51 @@ const fr: Dictionary = {
     selectExtractionsToVisualize: 'Sélectionnez des extractions à visualiser',
     metricsComparison: 'Comparaison de {{count}} indicateurs',
   },
+  landing: {
+    nav: {
+      signIn: 'Se connecter',
+    },
+    hero: {
+      badge: 'XBRL · SEC EDGAR · EDINET',
+      title: 'Les états financiers des dépôts officiels, sans travail manuel',
+      subtitle:
+        "FinExtract extrait les données XBRL directement depuis SEC EDGAR (États-Unis) et EDINET (Japon), les normalise en comptes de résultat, bilans et flux de trésorerie comparables, et exporte le tout vers Excel ou CSV.",
+      cta: 'Se connecter avec Google',
+      ctaHint: 'Gratuit — compte Google requis',
+    },
+    features: {
+      title: 'Fonctionnalités',
+      sources: {
+        title: 'Sources officielles',
+        description:
+          'Recherchez des sociétés et parcourez leurs dépôts directement depuis SEC EDGAR et EDINET — 10-K, 10-Q, rapports annuels sur titres.',
+      },
+      extraction: {
+        title: 'Extraction en un clic',
+        description:
+          "Choisissez un dépôt et FinExtract analyse le XBRL sous-jacent : compte de résultat, bilan et flux de trésorerie, pour chaque exercice présent dans le document.",
+      },
+      normalization: {
+        title: 'Normalisé & comparable',
+        description:
+          'Les postes sont rattachés à une taxonomie commune entre US GAAP et GAAP japonais, pour comparer côte à côte les dépôts des deux marchés.',
+      },
+      export: {
+        title: 'Export & visualisation',
+        description:
+          'Fusionnez plusieurs exercices, tracez les indicateurs clés et exportez des fichiers CSV ou Excel propres, prêts pour vos propres modèles.',
+      },
+    },
+    about: {
+      title: 'À propos du projet',
+      body: "FinExtract a été développé par Damien MATHIEU dans le cadre d'un stage de recherche à la School of Engineering de l'Université du Tohoku (Sendai, Japon).",
+      goal: "Son objectif : rendre accessible l'analyse comparée des états financiers entre marchés, en extrayant et normalisant les dépôts officiels des régulateurs américain et japonais au même endroit.",
+    },
+    footer: {
+      credit: '© {{year}} Damien MATHIEU — School of Engineering, Université du Tohoku',
+      sources: 'Données : SEC EDGAR · EDINET',
+    },
+  },
   dataViewer: {
     title: 'Visualiseur de données',
     noExtractionsSelected: 'Aucune extraction sélectionnée',

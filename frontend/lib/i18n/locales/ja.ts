@@ -118,6 +118,51 @@ const ja: Dictionary = {
     selectExtractionsToVisualize: '可視化する抽出データを選択してください',
     metricsComparison: '{{count}} 指標の比較',
   },
+  landing: {
+    nav: {
+      signIn: 'ログイン',
+    },
+    hero: {
+      badge: 'XBRL · SEC EDGAR · EDINET',
+      title: '公式開示書類から財務諸表を、手作業なしで',
+      subtitle:
+        'FinExtract は SEC EDGAR(米国)と EDINET(日本)から XBRL データを直接取得し、比較可能な損益計算書・貸借対照表・キャッシュフロー計算書に正規化して、Excel や CSV にエクスポートします。',
+      cta: 'Google でログイン',
+      ctaHint: '無料 — Google アカウントが必要です',
+    },
+    features: {
+      title: '主な機能',
+      sources: {
+        title: '公式データソース',
+        description:
+          'SEC EDGAR と EDINET から企業を検索し、開示書類(10-K、10-Q、有価証券報告書)を直接閲覧できます。',
+      },
+      extraction: {
+        title: 'ワンクリック抽出',
+        description:
+          '書類を選ぶだけで、FinExtract が XBRL を解析。損益計算書・貸借対照表・キャッシュフローを、文書内の全会計年度分抽出します。',
+      },
+      normalization: {
+        title: '正規化と比較',
+        description:
+          '勘定科目は US GAAP と日本基準をまたぐ共通タクソノミにマッピングされ、両市場の開示を並べて比較できます。',
+      },
+      export: {
+        title: 'エクスポートと可視化',
+        description:
+          '複数年度を統合し、主要指標をグラフ化。整形済みの CSV / Excel ファイルとして出力できます。',
+      },
+    },
+    about: {
+      title: 'このプロジェクトについて',
+      body: 'FinExtract は、Damien MATHIEU が東北大学 工学部(仙台)での研究インターンシップ中に開発しました。',
+      goal: '目標は、米国と日本の規制当局の公式開示を一箇所で抽出・正規化し、市場をまたいだ財務諸表分析を身近にすることです。',
+    },
+    footer: {
+      credit: '© {{year}} Damien MATHIEU — 東北大学 工学部',
+      sources: 'データ: SEC EDGAR · EDINET',
+    },
+  },
   dataViewer: {
     title: 'データビューア',
     noExtractionsSelected: '抽出データが選択されていません',

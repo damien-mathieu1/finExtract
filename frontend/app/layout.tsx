@@ -1,3 +1,4 @@
+import { ClerkLoaded, ClerkProvider } from '@clerk/nextjs'
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
@@ -27,12 +28,18 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="bg-background">
-      <body className={`${inter.className} antialiased`}>
-        <Providers>{children}</Providers>
-        <Toaster richColors position="top-right" />
-        {process.env.NODE_ENV === 'production' && <Analytics />}
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en" className="bg-background">
+        <body className={`${inter.className} antialiased`}>
+          {/* ClerkLoaded: the SPA fires queries on mount; wait until
+              window.Clerk is ready so every request can attach a token. */}
+          <ClerkLoaded>
+            <Providers>{children}</Providers>
+          </ClerkLoaded>
+          <Toaster richColors position="top-right" />
+          {process.env.NODE_ENV === 'production' && <Analytics />}
+        </body>
+      </html>
+    </ClerkProvider>
   )
 }
