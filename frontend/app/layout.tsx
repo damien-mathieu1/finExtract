@@ -11,7 +11,6 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'FinExtract — XBRL Financial Data Extraction',
   description: 'Extract, analyze and export financial data from XBRL filings with precision.',
-  generator: 'v0.app',
 }
 
 export const viewport: Viewport = {
@@ -36,7 +35,7 @@ export default function RootLayout({
           <ClerkLoaded>
             <Providers>{children}</Providers>
           </ClerkLoaded>
-          <Toaster richColors position="top-right" />
+          <Toaster richColors position="bottom-center" />
           {process.env.NODE_ENV === 'production' && <Analytics />}
         </body>
       </html>

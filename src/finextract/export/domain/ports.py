@@ -52,6 +52,12 @@ class ExtractionQueryPort(Protocol):
 
     def count_extractions_since(self, *, owner_id: str, since: datetime) -> int: ...
 
+    def delete_extractions(self, ids: list[int], *, owner_id: str) -> int:
+        """Deletes the given extractions (and their line items) if owned by
+        `owner_id`; ids not found or owned by someone else are silently
+        skipped. Returns how many rows were actually deleted."""
+        ...
+
 
 class PivotExportPort(Protocol):
     """Driven port: serialize several FinancialStatements (e.g. one per

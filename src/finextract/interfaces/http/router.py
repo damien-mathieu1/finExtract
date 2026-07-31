@@ -11,7 +11,11 @@ from finextract.export.application.export_statement import ExportStatement
 from finextract.export.domain.ports import ExtractionPersisterPort, ExtractionQueryPort
 from finextract.export.infrastructure.csv_exporter import CsvExporter
 from finextract.export.infrastructure.excel_exporter import ExcelExporter
-from finextract.export.infrastructure.pivot_exporter import PivotCsvExporter, PivotExcelExporter
+from finextract.export.infrastructure.pivot_exporter import (
+    FigureSpec,
+    PivotCsvExporter,
+    PivotExcelExporter,
+)
 from finextract.extraction.domain.ports import FilingDirectoryPort
 from finextract.interfaces.http.schemas import (
     CompanySummaryResponse,
@@ -25,6 +29,7 @@ from finextract.mapping.application.extract_uploaded_filing import ExtractUpload
 from finextract.mapping.application.normalize_statement import NormalizeStatement
 from finextract.mapping.domain.models import FinancialStatement
 from finextract.shared_kernel.errors import SourceNotFoundError
+from finextract.shared_kernel.value_objects import StatementCategory
 
 router = APIRouter()
 
@@ -292,6 +297,47 @@ def build_router(
             statements.append(statement)
         return _export_or_serialize_many(statements, format)
 
+    @router.get("/extractions/figures", response_model=None)
+    def export_figures(
+        ids: Annotated[list[int], Query()],
+        metric: Annotated[list[str], Query()],
+        user_id: str = Depends(verify_user),
+        chart_type: str = "bar",
+        title: str = "Figure",
+    ) -> Response:
+        """Combined PL/BS/CS export plus an extra "Figure" sheet: a data
+        table of the given metrics across the given extractions' periods,
+        with a native Excel chart bound to it. `metric` is repeated,
+        each formatted "category:field_name" (e.g. "income_statement:revenue"),
+        matching the metric picker on the frontend Charts page."""
+        if extraction_query is None:
+            raise HTTPException(status_code=503, detail="Extraction history not configured")
+        if chart_type not in ("bar", "line", "area"):
+            raise HTTPException(status_code=400, detail="chart_type must be bar, line or area")
+
+        statements = []
+        for extraction_id in ids:
+            statement = extraction_query.get_extraction(extraction_id, owner_id=user_id)
+            if statement is None:
+                raise HTTPException(status_code=404, detail=f"Extraction {extraction_id} not found")
+            statements.append(statement)
+
+        metrics = []
+        for m in metric:
+            category_str, _, field_name = m.partition(":")
+            try:
+                metrics.append((field_name, StatementCategory(category_str)))
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid metric category in '{m}'"
+                ) from exc
+
+        payload = PivotExcelExporter().export(
+            statements,
+            figure=FigureSpec(metrics=tuple(metrics), chart_type=chart_type, title=title),  # type: ignore[arg-type]
+        )
+        return Response(content=payload, media_type=_EXPORT_MEDIA_TYPES[ExportFormat.EXCEL])
+
     @router.get("/extractions/{extraction_id}", response_model=None)
     def get_extraction(
         extraction_id: int,
@@ -304,5 +350,28 @@ def build_router(
         if statement is None:
             raise HTTPException(status_code=404, detail="Extraction not found")
         return _export_or_serialize(statement, format)
+
+    @router.delete("/extractions/{extraction_id}")
+    def delete_extraction(
+        extraction_id: int, user_id: str = Depends(verify_user)
+    ) -> dict[str, int]:
+        if extraction_query is None:
+            raise HTTPException(status_code=503, detail="Extraction history not configured")
+        deleted = extraction_query.delete_extractions([extraction_id], owner_id=user_id)
+        if deleted == 0:
+            raise HTTPException(status_code=404, detail="Extraction not found")
+        return {"deleted": deleted}
+
+    @router.delete("/extractions")
+    def delete_extractions(
+        ids: Annotated[list[int], Query()],
+        user_id: str = Depends(verify_user),
+    ) -> dict[str, int]:
+        """Bulk delete - used to remove every period of a filing (a whole
+        "extraction group" in the frontend) in one call."""
+        if extraction_query is None:
+            raise HTTPException(status_code=503, detail="Extraction history not configured")
+        deleted = extraction_query.delete_extractions(ids, owner_id=user_id)
+        return {"deleted": deleted}
 
     return router

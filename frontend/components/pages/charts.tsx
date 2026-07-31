@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useQueries } from '@tanstack/react-query'
 import {
   ResponsiveContainer,
@@ -20,9 +20,18 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
-import { listExtractions, getExtraction } from '@/lib/api/extractions'
+import { listExtractions, getExtraction, downloadFigureExport } from '@/lib/api/extractions'
 import type { ExtractionSummaryResponse, FinancialStatementResponse } from '@/lib/api/types'
-import { BarChart2, TrendingUp, Activity, ChevronDown, SlidersHorizontal, X } from 'lucide-react'
+import {
+  BarChart2,
+  TrendingUp,
+  Activity,
+  ChevronDown,
+  SlidersHorizontal,
+  X,
+  Download,
+} from 'lucide-react'
+import { toast } from 'sonner'
 
 type ChartType = 'bar' | 'line' | 'area'
 type MetricKey = { label: string; xbrlTag: string; sheet: 'is' | 'bs' | 'cf' }
@@ -34,6 +43,16 @@ const CHART_TYPES: { id: ChartType; labelKey: string; icon: React.ReactNode }[] 
 ]
 
 const CATEGORY_TO_SHEET = { income_statement: 'is', balance_sheet: 'bs', cash_flow: 'cf' } as const
+const SHEET_TO_CATEGORY = {
+  is: 'income_statement',
+  bs: 'balance_sheet',
+  cf: 'cash_flow',
+} as const
+
+// Headline metrics to preselect (in priority order) once extractions/data
+// load, so a chart is already visible instead of an empty "select metrics"
+// state - falls back to whatever's first available if none of these exist.
+const DEFAULT_METRIC_FIELDS = ['revenue', 'net_income', 'operating_income', 'gross_profit']
 
 const METRIC_COLORS = [
   'var(--color-chart-1)',
@@ -263,22 +282,27 @@ function ControlsContent({
   )
 }
 
-export function ChartsPage() {
+interface ChartsPageProps {
+  initialSelectedIds?: number[]
+}
+
+export function ChartsPage({ initialSelectedIds = [] }: ChartsPageProps) {
   const { t } = useTranslation()
   const { data: completed = [] } = useQuery({
     queryKey: ['extractions'],
     queryFn: () => listExtractions({}),
   })
 
-  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [selectedIds, setSelectedIds] = useState<number[]>(initialSelectedIds)
   const [chartType, setChartType] = useState<ChartType>('bar')
   const [selectedMetrics, setSelectedMetrics] = useState<Set<string>>(new Set())
-  const [selectorOpen, setSelectorOpen] = useState(false)
+  const [selectorOpen, setSelectorOpen] = useState(initialSelectedIds.length > 0)
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false)
+  const hasAppliedDefaultMetrics = useRef(false)
 
   const statementQueries = useQueries({
     queries: selectedIds.map((id) => ({
-      queryKey: ['extraction-detail', [id]],
+      queryKey: ['chart-extraction-detail', id],
       queryFn: () => getExtraction(id),
     })),
   })
@@ -304,6 +328,19 @@ export function ChartsPage() {
     }
     return Array.from(map.values())
   }, [statements])
+
+  useEffect(() => {
+    if (hasAppliedDefaultMetrics.current) return
+    if (initialSelectedIds.length === 0 || availableMetrics.length === 0) return
+    hasAppliedDefaultMetrics.current = true
+
+    const byField = new Map(availableMetrics.map((m) => [m.label, m]))
+    const defaults = DEFAULT_METRIC_FIELDS.map((field) => byField.get(field)).filter(
+      (m): m is MetricKey => !!m
+    )
+    const picked = defaults.length > 0 ? defaults : availableMetrics.slice(0, 1)
+    setSelectedMetrics(new Set(picked.map((m) => m.xbrlTag)))
+  }, [availableMetrics, initialSelectedIds])
 
   const chartData = useMemo(() => {
     const years = Array.from(new Set(statements.map((s) => s.period_label))).sort()
@@ -336,6 +373,29 @@ export function ChartsPage() {
       next.has(tag) ? next.delete(tag) : next.add(tag)
       return next
     })
+  }
+
+  async function handleExportFigure() {
+    const metrics = availableMetrics
+      .filter((m) => selectedMetrics.has(m.xbrlTag))
+      .map((m) => ({ fieldName: m.label, category: SHEET_TO_CATEGORY[m.sheet] }))
+    if (metrics.length === 0) {
+      toast.error(t('charts.toasts.selectMetricsFirst'))
+      return
+    }
+    try {
+      await downloadFigureExport(
+        selectedIds,
+        metrics,
+        chartType,
+        selectedMetrics.size === 1
+          ? metrics[0].fieldName
+          : t('charts.metricsComparison', { count: selectedMetrics.size })
+      )
+      toast.success(t('charts.toasts.exportSuccess'))
+    } catch {
+      toast.error(t('charts.toasts.exportFailed'))
+    }
   }
 
   const ChartComponent = chartType === 'bar' ? BarChart : chartType === 'line' ? LineChart : AreaChart
@@ -374,20 +434,32 @@ export function ChartsPage() {
                   : selectedNames.join(' · ')}
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="md:hidden gap-1.5 h-8 text-xs shrink-0"
-              onClick={() => setMobileControlsOpen(true)}
-            >
-              <SlidersHorizontal size={13} />
-              {t('charts.settings')}
-              {selectedMetrics.size > 0 && (
-                <span className="ml-0.5 bg-primary/15 text-primary rounded-full px-1 text-[10px] font-medium">
-                  {selectedMetrics.size}
-                </span>
-              )}
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-8 text-xs shrink-0"
+                disabled={selectedMetrics.size === 0}
+                onClick={handleExportFigure}
+              >
+                <Download size={13} />
+                {t('charts.exportExcel')}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="md:hidden gap-1.5 h-8 text-xs shrink-0"
+                onClick={() => setMobileControlsOpen(true)}
+              >
+                <SlidersHorizontal size={13} />
+                {t('charts.settings')}
+                {selectedMetrics.size > 0 && (
+                  <span className="ml-0.5 bg-primary/15 text-primary rounded-full px-1 text-[10px] font-medium">
+                    {selectedMetrics.size}
+                  </span>
+                )}
+              </Button>
+            </div>
           </div>
           {selectedNames.length > 0 && (
             <div className="flex gap-1.5 flex-wrap mt-2 md:hidden">

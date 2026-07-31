@@ -244,3 +244,17 @@ class PostgresExporter:
                     for li in row.line_items
                 ],
             )
+
+    def delete_extractions(self, ids: list[int], *, owner_id: str) -> int:
+        if not ids:
+            return 0
+        with self._session_factory() as session:
+            rows = (
+                session.query(ExtractionRow)
+                .filter(ExtractionRow.id.in_(ids), ExtractionRow.owner_id == owner_id)
+                .all()
+            )
+            for row in rows:
+                session.delete(row)
+            session.commit()
+            return len(rows)

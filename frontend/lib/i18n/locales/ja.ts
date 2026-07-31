@@ -30,11 +30,8 @@ const ja: Dictionary = {
     tabs: {
       'sec-edgar': 'SEC EDGAR',
       edinet: 'EDINET',
-      'xbrl-api': 'XBRL API',
       'upload-xbrl': 'XBRLファイル',
-      'upload-pdf': 'PDF / OCR',
     },
-    notSupported: 'サーバー側で未対応です。SEC EDGARを利用するか、XBRLファイルをアップロードしてください。',
     searchPlaceholderSecEdgar: '企業名、ティッカー、またはCIK…',
     searchPlaceholderEdinet: '企業名またはティッカー…',
     searchButton: '検索',
@@ -80,6 +77,7 @@ const ja: Dictionary = {
     selected: '{{count}} 件選択中',
     mergeAndView: '統合して表示',
     exportXlsx: 'XLSXをエクスポート',
+    exportCsv: 'CSVをエクスポート',
     filterPlaceholder: '抽出履歴を絞り込み…',
     columns: {
       company: '企業',
@@ -95,11 +93,18 @@ const ja: Dictionary = {
     viewData: 'データを表示',
     view: '表示',
     xlsx: 'XLSX',
+    csv: 'CSV',
+    deleteOne: '削除',
+    deleteGroup: 'すべての期間を削除',
+    confirmDeleteOne: '「{{label}}」を削除しますか?元に戻せません。',
+    confirmDeleteGroup: '「{{label}}」のすべての期間を削除しますか?元に戻せません。',
     toasts: {
       pleaseSelect: 'エクスポートする抽出を選択してください。',
       exportReady: 'XLSXエクスポートの準備ができました',
       exportFailed: 'エクスポートに失敗しました',
       selectAtLeastTwo: '統合するには2件以上選択してください。',
+      deleteSuccess: '削除しました',
+      deleteFailed: '削除に失敗しました',
     },
   },
   charts: {
@@ -117,6 +122,12 @@ const ja: Dictionary = {
     selectMetricPrompt: '設定で少なくとも1つの指標を選択してください',
     selectExtractionsToVisualize: '可視化する抽出データを選択してください',
     metricsComparison: '{{count}} 指標の比較',
+    exportExcel: 'Excelにエクスポート',
+    toasts: {
+      selectMetricsFirst: 'エクスポートする指標を1つ以上選択してください。',
+      exportSuccess: 'Excelエクスポートの準備ができました',
+      exportFailed: 'エクスポートに失敗しました',
+    },
   },
   landing: {
     nav: {
@@ -161,6 +172,7 @@ const ja: Dictionary = {
     footer: {
       credit: '© {{year}} Damien MATHIEU — 東北大学 工学部',
       sources: 'データ: SEC EDGAR · EDINET',
+      repo: 'ソースコード',
     },
   },
   dataViewer: {
@@ -169,6 +181,7 @@ const ja: Dictionary = {
     extractionsMerged: '{{count}} 件の抽出データを統合',
     charts: 'グラフ',
     xlsx: 'XLSX',
+    csv: 'CSV',
     selectExtractionsToView: '表示する抽出データを選択してください',
     extractionsSelectedCount: '{{count}} 件の抽出データを選択中',
     noExtractionsYet: '抽出履歴はまだありません',

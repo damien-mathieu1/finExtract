@@ -10,7 +10,6 @@ import { DataViewerPage } from '@/components/pages/data-viewer'
 import { ChartsPage } from '@/components/pages/charts'
 import { LandingPage } from '@/components/pages/landing'
 import { listExtractions } from '@/lib/api/extractions'
-import { Toaster } from '@/components/ui/sonner'
 
 // The app lives in its own component so its queries only mount for
 // signed-in users; signed-out visitors get the public landing page.
@@ -23,7 +22,7 @@ function AppShell() {
   })
 
   function handleNavigate(page: AppPage, selectedIds?: number[]) {
-    if (page === 'viewer' && selectedIds) {
+    if ((page === 'viewer' || page === 'charts') && selectedIds) {
       setViewerIds(selectedIds)
     }
     setActivePage(page)
@@ -40,11 +39,10 @@ function AppShell() {
         {activePage === 'search' && <FilingSearchPage onNavigate={handleNavigate} />}
         {activePage === 'extractions' && <ExtractionsPage onNavigate={handleNavigate} />}
         {activePage === 'viewer' && (
-          <DataViewerPage selectedExtractionIds={viewerIds} onNavigate={setActivePage} />
+          <DataViewerPage selectedExtractionIds={viewerIds} onNavigate={handleNavigate} />
         )}
-        {activePage === 'charts' && <ChartsPage />}
+        {activePage === 'charts' && <ChartsPage initialSelectedIds={viewerIds} />}
       </main>
-      <Toaster position="bottom-center" />
     </div>
   )
 }

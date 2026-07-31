@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Download, Eye, ChevronDown, BarChart2 } from 'lucide-react'
+import { Download, Eye, ChevronDown, BarChart2, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -15,7 +15,7 @@ import type { AppPage } from '@/components/app-sidebar'
 
 interface DataViewerPageProps {
   selectedExtractionIds: number[]
-  onNavigate: (page: AppPage) => void
+  onNavigate: (page: AppPage, selectedIds?: number[]) => void
 }
 
 type SheetKey = 'is' | 'bs' | 'cf'
@@ -116,7 +116,7 @@ export function DataViewerPage({ selectedExtractionIds, onNavigate }: DataViewer
   })
 
   const { data: statements = [] } = useQuery({
-    queryKey: ['extraction-detail', localIds],
+    queryKey: ['data-viewer-statements', localIds],
     queryFn: () =>
       localIds.length > 1
         ? combineExtractions(localIds)
@@ -129,11 +129,11 @@ export function DataViewerPage({ selectedExtractionIds, onNavigate }: DataViewer
   const result = toExtractionResult(statements)
   const years = Array.from(new Set(statements.map((s) => s.period_label))).sort()
 
-  async function handleExportXlsx() {
+  async function handleExport(format: 'excel' | 'csv') {
     if (localIds.length === 0) return
     try {
-      if (localIds.length > 1) await downloadCombinedExport(localIds, 'excel')
-      else await downloadExport(localIds[0], 'excel')
+      if (localIds.length > 1) await downloadCombinedExport(localIds, format)
+      else await downloadExport(localIds[0], format)
       toast.success(t('dataViewer.toasts.exportSuccess'))
     } catch {
       toast.error(t('dataViewer.toasts.exportFailed'))
@@ -161,7 +161,7 @@ export function DataViewerPage({ selectedExtractionIds, onNavigate }: DataViewer
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onNavigate('charts')}
+              onClick={() => onNavigate('charts', localIds)}
               className="gap-1.5 h-8 text-xs"
             >
               <BarChart2 size={13} />
@@ -169,12 +169,22 @@ export function DataViewerPage({ selectedExtractionIds, onNavigate }: DataViewer
             </Button>
             <Button
               size="sm"
-              onClick={handleExportXlsx}
+              onClick={() => handleExport('excel')}
               disabled={localIds.length === 0}
               className="gap-1.5 h-8 text-xs"
             >
               <Download size={13} />
               {t('dataViewer.xlsx')}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleExport('csv')}
+              disabled={localIds.length === 0}
+              className="gap-1.5 h-8 text-xs"
+            >
+              <FileText size={13} />
+              {t('dataViewer.csv')}
             </Button>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { authHeaders, buildQuery, get, post } from './client'
+import { authHeaders, buildQuery, del, get, post } from './client'
 import type { ExportFormat, ExtractionSummaryResponse, FinancialStatementResponse } from './types'
 
 export function processFiling(
@@ -56,6 +56,34 @@ export function listExtractions(params: {
 
 export function getExtraction(id: number): Promise<FinancialStatementResponse> {
   return get(`/extractions/${id}`)
+}
+
+export function deleteExtraction(id: number): Promise<{ deleted: number }> {
+  return del(`/extractions/${id}`)
+}
+
+export function deleteExtractions(ids: number[]): Promise<{ deleted: number }> {
+  const search = new URLSearchParams()
+  ids.forEach((id) => search.append('ids', String(id)))
+  return del(`/extractions?${search.toString()}`)
+}
+
+export async function downloadFigureExport(
+  ids: number[],
+  metrics: { fieldName: string; category: string }[],
+  chartType: 'bar' | 'line' | 'area',
+  title?: string,
+): Promise<void> {
+  const search = new URLSearchParams()
+  ids.forEach((id) => search.append('ids', String(id)))
+  metrics.forEach((m) => search.append('metric', `${m.category}:${m.fieldName}`))
+  search.set('chart_type', chartType)
+  if (title) search.set('title', title)
+  const res = await fetch(`/api/extractions/figures?${search.toString()}`, {
+    headers: await authHeaders(),
+  })
+  if (!res.ok) throw new Error(`Export failed: ${res.status}`)
+  await triggerDownload(res, 'excel')
 }
 
 function combineQuery(ids: number[], format: string): string {

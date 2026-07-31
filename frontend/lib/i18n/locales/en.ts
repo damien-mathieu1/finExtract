@@ -28,11 +28,8 @@ const en = {
     tabs: {
       'sec-edgar': 'SEC EDGAR',
       edinet: 'EDINET',
-      'xbrl-api': 'XBRL API',
       'upload-xbrl': 'XBRL File',
-      'upload-pdf': 'PDF / OCR',
     },
-    notSupported: 'Not yet supported by the backend. Try SEC EDGAR or upload an XBRL file instead.',
     searchPlaceholderSecEdgar: 'Company, ticker or CIK…',
     searchPlaceholderEdinet: 'Company name or ticker…',
     searchButton: 'Search',
@@ -77,6 +74,7 @@ const en = {
     selected: '{{count}} selected',
     mergeAndView: 'Merge & View',
     exportXlsx: 'Export XLSX',
+    exportCsv: 'Export CSV',
     filterPlaceholder: 'Filter extractions…',
     columns: {
       company: 'Company',
@@ -92,11 +90,18 @@ const en = {
     viewData: 'View data',
     view: 'View',
     xlsx: 'XLSX',
+    csv: 'CSV',
+    deleteOne: 'Delete',
+    deleteGroup: 'Delete all periods',
+    confirmDeleteOne: 'Delete "{{label}}"? This cannot be undone.',
+    confirmDeleteGroup: 'Delete all periods of "{{label}}"? This cannot be undone.',
     toasts: {
       pleaseSelect: 'Please select extractions to export.',
       exportReady: 'XLSX export ready',
       exportFailed: 'Export failed',
       selectAtLeastTwo: 'Select at least 2 extractions to merge.',
+      deleteSuccess: 'Deleted',
+      deleteFailed: 'Delete failed',
     },
   },
   charts: {
@@ -114,6 +119,12 @@ const en = {
     selectMetricPrompt: 'Select at least one metric in Settings',
     selectExtractionsToVisualize: 'Select extractions to visualize',
     metricsComparison: '{{count}} Metrics Comparison',
+    exportExcel: 'Export to Excel',
+    toasts: {
+      selectMetricsFirst: 'Select at least one metric to export.',
+      exportSuccess: 'Excel export ready',
+      exportFailed: 'Export failed',
+    },
   },
   landing: {
     nav: {
@@ -158,6 +169,7 @@ const en = {
     footer: {
       credit: '© {{year}} Damien MATHIEU — School of Engineering, Tohoku University',
       sources: 'Data: SEC EDGAR · EDINET',
+      repo: 'Source code',
     },
   },
   dataViewer: {
@@ -166,6 +178,7 @@ const en = {
     extractionsMerged: '{{count}} extractions merged',
     charts: 'Charts',
     xlsx: 'XLSX',
+    csv: 'CSV',
     selectExtractionsToView: 'Select extractions to view',
     extractionsSelectedCount: '{{count}} extraction(s) selected',
     noExtractionsYet: 'No extractions yet',

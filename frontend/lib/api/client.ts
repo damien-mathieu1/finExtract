@@ -37,6 +37,10 @@ export function post<T>(path: string): Promise<T> {
   return request<T>(path, { method: 'POST' })
 }
 
+export function del<T>(path: string): Promise<T> {
+  return request<T>(path, { method: 'DELETE' })
+}
+
 export function buildQuery(params: Record<string, string | number | undefined>): string {
   const search = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {

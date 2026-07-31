@@ -2,16 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  Search,
-  Upload,
-  AlertTriangle,
-  CheckCircle2,
-  Loader2,
-  X,
-  ArrowLeft,
-  Plus,
-} from 'lucide-react'
+import { Search, Upload, CheckCircle2, Loader2, X, ArrowLeft, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -23,12 +14,10 @@ import type { FilingSource } from '@/lib/types'
 import { toast } from 'sonner'
 import type { AppPage } from '@/components/app-sidebar'
 
-const SOURCE_TABS: { id: FilingSource; supported: boolean }[] = [
-  { id: 'sec-edgar', supported: true },
-  { id: 'edinet', supported: true },
-  { id: 'xbrl-api', supported: false },
-  { id: 'upload-xbrl', supported: true },
-  { id: 'upload-pdf', supported: false },
+const SOURCE_TABS: { id: FilingSource }[] = [
+  { id: 'sec-edgar' },
+  { id: 'edinet' },
+  { id: 'upload-xbrl' },
 ]
 
 const DIRECTORY_SOURCES: FilingSource[] = ['sec-edgar', 'edinet']
@@ -170,13 +159,6 @@ export function FilingSearchPage({ onNavigate }: FilingSearchProps) {
           </button>
         ))}
       </div>
-
-      {!SOURCE_TABS.find((tab) => tab.id === sourceTab)?.supported && (
-        <div className="mx-4 mt-4 flex items-start gap-2 rounded-md bg-warning/10 border border-warning/30 p-3 shrink-0">
-          <AlertTriangle size={16} className="text-warning shrink-0 mt-0.5" />
-          <p className="text-xs text-warning leading-relaxed">{t('filingSearch.notSupported')}</p>
-        </div>
-      )}
 
       {/* Search input */}
       {isDirectorySource && (

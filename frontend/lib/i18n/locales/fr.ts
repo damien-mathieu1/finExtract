@@ -30,12 +30,8 @@ const fr: Dictionary = {
     tabs: {
       'sec-edgar': 'SEC EDGAR',
       edinet: 'EDINET',
-      'xbrl-api': 'API XBRL',
       'upload-xbrl': 'Fichier XBRL',
-      'upload-pdf': 'PDF / OCR',
     },
-    notSupported:
-      "Pas encore pris en charge par le serveur. Essayez SEC EDGAR ou importez un fichier XBRL.",
     searchPlaceholderSecEdgar: 'Société, symbole ou CIK…',
     searchPlaceholderEdinet: 'Nom de société ou symbole…',
     searchButton: 'Rechercher',
@@ -82,6 +78,7 @@ const fr: Dictionary = {
     selected: '{{count}} sélectionné(s)',
     mergeAndView: 'Fusionner & afficher',
     exportXlsx: 'Exporter XLSX',
+    exportCsv: 'Exporter CSV',
     filterPlaceholder: 'Filtrer les extractions…',
     columns: {
       company: 'Société',
@@ -97,11 +94,19 @@ const fr: Dictionary = {
     viewData: 'Voir les données',
     view: 'Voir',
     xlsx: 'XLSX',
+    csv: 'CSV',
+    deleteOne: 'Supprimer',
+    deleteGroup: 'Supprimer toutes les périodes',
+    confirmDeleteOne: 'Supprimer « {{label}} » ? Cette action est irréversible.',
+    confirmDeleteGroup:
+      'Supprimer toutes les périodes de « {{label}} » ? Cette action est irréversible.',
     toasts: {
       pleaseSelect: 'Veuillez sélectionner des extractions à exporter.',
       exportReady: 'Export XLSX prêt',
       exportFailed: "Échec de l'export",
       selectAtLeastTwo: 'Sélectionnez au moins 2 extractions à fusionner.',
+      deleteSuccess: 'Supprimé',
+      deleteFailed: 'Échec de la suppression',
     },
   },
   charts: {
@@ -119,6 +124,12 @@ const fr: Dictionary = {
     selectMetricPrompt: 'Sélectionnez au moins un indicateur dans Paramètres',
     selectExtractionsToVisualize: 'Sélectionnez des extractions à visualiser',
     metricsComparison: 'Comparaison de {{count}} indicateurs',
+    exportExcel: 'Exporter vers Excel',
+    toasts: {
+      selectMetricsFirst: 'Sélectionnez au moins un indicateur à exporter.',
+      exportSuccess: 'Export Excel prêt',
+      exportFailed: "Échec de l'export",
+    },
   },
   landing: {
     nav: {
@@ -163,6 +174,7 @@ const fr: Dictionary = {
     footer: {
       credit: '© {{year}} Damien MATHIEU — School of Engineering, Université du Tohoku',
       sources: 'Données : SEC EDGAR · EDINET',
+      repo: 'Code source',
     },
   },
   dataViewer: {
@@ -171,6 +183,7 @@ const fr: Dictionary = {
     extractionsMerged: '{{count}} extractions fusionnées',
     charts: 'Graphiques',
     xlsx: 'XLSX',
+    csv: 'CSV',
     selectExtractionsToView: 'Sélectionnez des extractions à afficher',
     extractionsSelectedCount: '{{count}} extraction(s) sélectionnée(s)',
     noExtractionsYet: 'Aucune extraction pour le moment',

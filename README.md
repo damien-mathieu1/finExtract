@@ -1,110 +1,103 @@
 # FinExtract
 
-Automates extraction of financial data from company filings. XBRL/iXBRL is the
-preferred source (machine-readable, direct taxonomy extraction); a PDF/OCR
-fallback pipeline is planned but not yet implemented. Output is normalized
-into a standard financial schema and exported as CSV, Excel, JSON, or
-persisted to PostgreSQL.
+Pulls financial statements out of official company filings (SEC EDGAR for
+the US, EDINET for Japan) via their XBRL/iXBRL data, normalizes them into a
+common schema across US GAAP / Japanese GAAP / IFRS, and exports clean
+CSV/Excel — so you don't have to copy numbers out of a PDF by hand.
+
+FastAPI backend + Next.js frontend, Clerk auth, Postgres for extraction
+history.
+
+## How it works
+
+1. **Extract** — fetch a filing's raw XBRL facts (SEC EDGAR, EDINET, or a
+   user-uploaded XBRL file).
+2. **Map** — translate filer-specific tags (`us-gaap:Revenues`,
+   `jppfs_cor:NetSales`, ...) into a standard field set (`revenue`,
+   `net_income`, ...) via a static tag lookup table.
+3. **Export** — serve the normalized statement as JSON, or as a
+   Bloomberg-style CSV/Excel workbook (styled PL/BS/CS sheets, optional
+   chart sheet), or persist it to Postgres as extraction history.
 
 ## Architecture
 
-Single FastAPI service, internally organized as DDD bounded contexts with
-hexagonal (ports & adapters) boundaries. Each context can later be lifted
-into its own deployable service without touching the domain logic.
+DDD bounded contexts with hexagonal (ports & adapters) boundaries, all
+inside one FastAPI service — each context could become its own deployable
+service later without touching domain logic.
 
 ```
 src/finextract/
 ├── shared_kernel/    # cross-context value objects (Currency, FiscalPeriod, ReportingStandard)
-├── extraction/       # Extract: get raw facts from a filing (XBRL today, PDF/OCR later)
-├── mapping/          # Transform: normalize raw facts into the standard financial schema
-├── export/           # Load: write the standard schema to CSV/Excel/JSON/Postgres
-└── interfaces/http/  # FastAPI routes — the driving adapter into application use cases
+├── extraction/       # get raw XBRL facts from a filing
+├── mapping/          # normalize raw facts into the standard schema
+├── export/           # write the standard schema to CSV/Excel/Postgres
+└── interfaces/http/  # FastAPI routes (driving adapter)
 ```
 
-Each context follows the same layering:
+Each context: `domain/` (entities + `ports.py`, no framework imports) →
+`application/` (use cases) → `infrastructure/` (adapters: XBRL parser,
+tag map, CSV/Excel/Postgres writers). Infrastructure depends on domain
+ports, never the reverse.
 
-- `domain/` — entities, value objects, and `ports.py` (interfaces). Zero
-  framework imports — pure Python, unit-testable in isolation.
-- `application/` — use cases that orchestrate domain logic via ports.
-- `infrastructure/` — concrete adapters implementing the ports (XBRL parser,
-  taxonomy mapping table, CSV/Excel/Postgres writers).
-
-Dependency direction always points inward: infrastructure depends on domain
-ports, never the reverse. This is what makes it possible to add a PDF/OCR
-adapter later by implementing `FilingSourcePort` again, with zero changes to
-`mapping/` or `export/`.
+`frontend/` is a separate Next.js app (App Router) — filing search, saved
+extractions, a data viewer, and charts with Excel export.
 
 ## API
 
-- `GET /companies/search?q=apple` — search SEC-registered companies by name/ticker
-- `GET /companies/{cik}/filings` — list a company's 10-K/10-Q filings with direct document URLs
-- `POST /filings/process?document_url=...&format=json|csv|excel` — fetch + parse + normalize a chosen filing
-- `POST /filings/extract?company_identifier=...&format=...` — same pipeline against a local fixture file (dev/testing), see `FILINGS_DIR`
+- `GET /companies/search?q=apple&source=sec-edgar|edinet` — search companies
+- `GET /companies/{identifier}/filings?source=...` — list a company's filings
+- `POST /filings/process?document_url=...&source=...&format=json|csv|excel` — extract + persist one filing
+- `POST /filings/upload` — same pipeline for a user-uploaded XBRL file
+- `GET /extractions` — list saved extractions (owner-scoped)
+- `GET /extractions/{id}?format=...` / `GET /extractions/combine?ids=...&format=...` — fetch or export one/many
+- `GET /extractions/figures?ids=...&metric=...&chart_type=...` — export with a native Excel chart sheet
+- `DELETE /extractions/{id}` / `DELETE /extractions?ids=...` — delete one or many
 
-The SEC EDGAR endpoints require `SEC_EDGAR_USER_AGENT` to be set (SEC rejects
-requests without an identifying User-Agent) — see `.env.example`. Without it,
-`/companies/*` and `/filings/process` return 503; `/filings/extract` still
-works against local fixtures.
+All routes except `/` and `/sign-in` require a Clerk session; SEC EDGAR
+endpoints also need `SEC_EDGAR_USER_AGENT` set (SEC rejects anonymous
+requests), EDINET needs `EDINET_API_KEY`. Auto-generated docs at `/docs`.
 
-Workflow: `search_companies` → pick a `cik` → `list_filings(cik)` → pick a
-`document_url` → `process_filing(document_url)`.
+## Running locally
 
-OpenAPI spec is auto-generated by FastAPI, no extra setup: `GET /openapi.json`
-(raw spec), `GET /docs` (Swagger UI), `GET /redoc`.
-
-## Getting started
-
-Dependency management uses [uv](https://docs.astral.sh/uv/).
+Quickest path — full stack (Postgres + API + frontend) via Docker:
 
 ```bash
-cp .env.example .env
-uv sync                 # installs deps + dev group into .venv, from uv.lock
-uv run pre-commit install   # one-time: enables lint/format on every commit
-uv run pytest
-uv run uvicorn finextract.main:app --reload   # local dev, needs FILINGS_DIR set
+cp .env.example .env   # fill in Clerk + SEC/EDINET keys
+docker compose up --build
+# frontend: http://localhost:3000
+# API docs: http://localhost:8000/docs
 ```
 
-Pre-commit hooks (ruff lint + format, whitespace/EOF/yaml/toml checks) run
-automatically on `git commit`. Run them on demand with `uv run pre-commit run --all-files`.
-
-Or via Docker (postgres + api):
+Backend-only, using [uv](https://docs.astral.sh/uv/):
 
 ```bash
-docker compose up --build
-# API docs: http://localhost:8000/docs
+uv sync
+uv run pre-commit install   # one-time: lint/format on every commit
+uv run pytest
+uv run uvicorn finextract.main:app --reload
 ```
 
 ## Deployment
 
-Deploys to GCP Cloud Run (api + frontend) via OpenTofu + GitHub Actions.
-Db is [Neon](https://neon.tech) (managed Postgres, autosuspends compute on
-idle but doesn't pause the whole project like Supabase free tier does).
+GCP Cloud Run (api + frontend), provisioned via OpenTofu, deployed on every
+GitHub Release via `.github/workflows/deploy.yml`. Postgres is
+[Neon](https://neon.tech). Full detail in [`infra/README.md`](infra/README.md).
 
 ```bash
 cd infra
 cp terraform.tfvars.example terraform.tfvars   # fill in real values
-tofu init
-tofu apply
+tofu init && tofu apply
 ```
 
-Then set repo secrets from `tofu output` (`GCP_PROJECT_ID`,
-`GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_DEPLOYER_SA_EMAIL`), mark the two
-GHCR packages public after the first deploy, and every GitHub Release
-publish triggers `.github/workflows/deploy.yml` (build + push images,
-`gcloud run deploy`). Full detail in [`infra/README.md`](infra/README.md).
+**Before going live**: set up [GCP budget alerts + budget actions](https://cloud.google.com/billing/docs/how-to/budgets) —
+actual protection against a runaway bill, unlike a limited-balance card
+(which only blocks the charge after the fact).
 
-**Before going live**: set up [GCP budget alerts + budget actions](https://cloud.google.com/billing/docs/how-to/budgets)
-(auto-disable billing past a threshold) — real protection against a runaway
-bill, unlike a limited-balance card which only blocks the charge after the
-fact and can still get the GCP account suspended/flagged.
+## Known gaps
 
-## Status
-
-MVP scope: XBRL extraction path only, sourced from local fixtures or live SEC
-EDGAR filings. PDF/OCR fallback and frontend are deferred — see the
-bounded-context seams above for where they plug in.
-
-Known gaps: fiscal period is not yet parsed from the filing's XBRL context
-(hardcoded to today's date); the tag → field lookup table covers ~20 common
-us-gaap tags and silently drops unmapped ones; only 10-K/10-Q/20-F/40-F form
-types are considered.
+- PDF/OCR extraction isn't implemented (XBRL only for now).
+- Only extractions made *after* a given tag-map update get the benefit of
+  it — the tag map is applied at extraction time, not retroactively on
+  re-export, and raw XBRL facts aren't kept, so re-extracting is the only
+  way to backfill an older saved extraction.
+- Only 10-K/10-Q/20-F/40-F form types are considered on SEC EDGAR.

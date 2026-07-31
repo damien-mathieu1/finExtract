@@ -1,13 +1,29 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { GitMerge, Download, Eye, Search, CheckCircle2, ChevronRight, ChevronDown } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  GitMerge,
+  Download,
+  Eye,
+  Search,
+  CheckCircle2,
+  ChevronRight,
+  ChevronDown,
+  FileText,
+  Trash2,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
-import { listExtractions, downloadCombinedExport, downloadExport } from '@/lib/api/extractions'
+import {
+  listExtractions,
+  downloadCombinedExport,
+  downloadExport,
+  deleteExtraction,
+  deleteExtractions,
+} from '@/lib/api/extractions'
 import type { ExtractionSummaryResponse } from '@/lib/api/types'
 import { toast } from 'sonner'
 import type { AppPage } from '@/components/app-sidebar'
@@ -19,6 +35,7 @@ interface ExtractionsPageProps {
 
 export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
   const { data: extractions = [] } = useQuery({
     queryKey: ['extractions'],
     queryFn: () => listExtractions({}),
@@ -74,24 +91,57 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
     }
   }
 
-  async function handleExportSelected() {
+  async function handleExportSelected(format: 'excel' | 'csv') {
     if (selectedIds.size === 0) {
       toast.error(t('extractions.toasts.pleaseSelect'))
       return
     }
     try {
-      await downloadCombinedExport(Array.from(selectedIds), 'excel')
+      await downloadCombinedExport(Array.from(selectedIds), format)
       toast.success(t('extractions.toasts.exportReady'))
     } catch {
       toast.error(t('extractions.toasts.exportFailed'))
     }
   }
 
-  async function handleExportSingle(id: number) {
+  async function handleExportSingle(id: number, format: 'excel' | 'csv') {
     try {
-      await downloadExport(id, 'excel')
+      await downloadExport(id, format)
     } catch {
       toast.error(t('extractions.toasts.exportFailed'))
+    }
+  }
+
+  async function handleDeleteSingle(ext: ExtractionSummaryResponse) {
+    const label = ext.label || ext.company_name
+    if (!window.confirm(t('extractions.confirmDeleteOne', { label }))) return
+    try {
+      await deleteExtraction(ext.id)
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        next.delete(ext.id)
+        return next
+      })
+      await queryClient.invalidateQueries({ queryKey: ['extractions'] })
+      toast.success(t('extractions.toasts.deleteSuccess'))
+    } catch {
+      toast.error(t('extractions.toasts.deleteFailed'))
+    }
+  }
+
+  async function handleDeleteGroup(group: { displayName: string; items: ExtractionSummaryResponse[] }) {
+    if (!window.confirm(t('extractions.confirmDeleteGroup', { label: group.displayName }))) return
+    try {
+      await deleteExtractions(group.items.map((e) => e.id))
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        for (const e of group.items) next.delete(e.id)
+        return next
+      })
+      await queryClient.invalidateQueries({ queryKey: ['extractions'] })
+      toast.success(t('extractions.toasts.deleteSuccess'))
+    } catch {
+      toast.error(t('extractions.toasts.deleteFailed'))
     }
   }
 
@@ -144,9 +194,22 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
                 {t('extractions.mergeAndView')}
               </Button>
             )}
-            <Button size="sm" onClick={handleExportSelected} className="gap-1.5 h-8 text-xs">
+            <Button
+              size="sm"
+              onClick={() => handleExportSelected('excel')}
+              className="gap-1.5 h-8 text-xs"
+            >
               <Download size={13} />
               {t('extractions.exportXlsx')}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleExportSelected('csv')}
+              className="gap-1.5 h-8 text-xs"
+            >
+              <Download size={13} />
+              {t('extractions.exportCsv')}
             </Button>
           </div>
         )}
@@ -179,7 +242,7 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
         <span className="w-20 text-center">{t('extractions.columns.period')}</span>
         <span className="w-24 text-center">{t('extractions.columns.standard')}</span>
         <span className="w-24 text-right">{t('extractions.columns.extracted')}</span>
-        <span className="w-24 text-right">{t('extractions.columns.actions')}</span>
+        <span className="w-40 text-right">{t('extractions.columns.actions')}</span>
       </div>
 
       {/* List */}
@@ -247,6 +310,15 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
                       {t('extractions.mergeAndView')}
                     </Button>
                   )}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+                    title={t('extractions.deleteGroup')}
+                    onClick={() => handleDeleteGroup(group)}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
                 </div>
               )}
 
@@ -289,7 +361,7 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
               <span className="w-24 text-right text-xs text-muted-foreground">
                 {format(new Date(ext.extracted_at), 'MMM d, HH:mm')}
               </span>
-              <div className="w-24 flex items-center justify-end gap-1">
+              <div className="w-40 flex items-center justify-end gap-1">
                 <Button
                   size="icon"
                   variant="ghost"
@@ -304,9 +376,27 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
                   variant="ghost"
                   className="h-7 w-7"
                   title={t('extractions.exportXlsx')}
-                  onClick={() => handleExportSingle(ext.id)}
+                  onClick={() => handleExportSingle(ext.id, 'excel')}
                 >
                   <Download size={14} />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  title={t('extractions.exportCsv')}
+                  onClick={() => handleExportSingle(ext.id, 'csv')}
+                >
+                  <FileText size={14} />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-destructive hover:text-destructive"
+                  title={t('extractions.deleteOne')}
+                  onClick={() => handleDeleteSingle(ext)}
+                >
+                  <Trash2 size={14} />
                 </Button>
               </div>
             </div>
@@ -360,10 +450,28 @@ export function ExtractionsPage({ onNavigate }: ExtractionsPageProps) {
                     size="sm"
                     variant="outline"
                     className="h-7 text-xs gap-1.5 px-2.5"
-                    onClick={() => handleExportSingle(ext.id)}
+                    onClick={() => handleExportSingle(ext.id, 'excel')}
                   >
                     <Download size={12} />
                     {t('extractions.xlsx')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs gap-1.5 px-2.5"
+                    onClick={() => handleExportSingle(ext.id, 'csv')}
+                  >
+                    <FileText size={12} />
+                    {t('extractions.csv')}
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="h-7 w-7 text-destructive hover:text-destructive"
+                    title={t('extractions.deleteOne')}
+                    onClick={() => handleDeleteSingle(ext)}
+                  >
+                    <Trash2 size={12} />
                   </Button>
                 </div>
               </div>

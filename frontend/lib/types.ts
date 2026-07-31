@@ -1,4 +1,4 @@
-export type FilingSource = 'sec-edgar' | 'edinet' | 'xbrl-api' | 'upload-xbrl' | 'upload-pdf'
+export type FilingSource = 'sec-edgar' | 'edinet' | 'upload-xbrl'
 
 export interface SheetRow {
   label: string
