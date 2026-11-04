@@ -45,10 +45,13 @@ def build_pivot_dataframe(statements: list[FinancialStatement]) -> pd.DataFrame:
     per distinct period found across the given statements, sorted by
     fiscal_year. Several companies get separate columns (see _column_label)."""
     multi_company = _is_multi_company(statements)
-    ordered_labels = [
-        _column_label(s, multi_company)
-        for s in sorted(statements, key=lambda s: s.fiscal_period.fiscal_year)
-    ]
+    # Overlapping filings repeat a period: one column, the first statement given wins.
+    ordered_labels = list(
+        dict.fromkeys(
+            _column_label(s, multi_company)
+            for s in sorted(statements, key=lambda s: s.fiscal_period.fiscal_year)
+        )
+    )
 
     long_rows = [
         {
@@ -248,7 +251,7 @@ def _write_figure_sheet(
         for field_name, category in figure.metrics:
             value = None
             for statement in ordered_statements:
-                if _column_label(statement, multi_company) != period:
+                if value is not None or _column_label(statement, multi_company) != period:
                     continue
                 for li in statement.line_items:
                     if li.field_name == field_name and li.category == category:

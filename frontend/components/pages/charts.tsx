@@ -341,7 +341,7 @@ export function ChartsPage({ initialSelectedIds = [] }: ChartsPageProps) {
           const seriesKey = multiCompany
             ? `${statement.company_name} · ${item.field_name}`
             : item.field_name
-          point[seriesKey] = item.value
+          point[seriesKey] ??= item.value
         }
       }
       return point
