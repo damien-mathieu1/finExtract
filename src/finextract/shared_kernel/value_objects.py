@@ -11,6 +11,20 @@ class Currency(StrEnum):
     GBP = "GBP"
     JPY = "JPY"
     KRW = "KRW"
+    AUD = "AUD"
+    BRL = "BRL"
+    CAD = "CAD"
+    CHF = "CHF"
+    CNY = "CNY"
+    DKK = "DKK"
+    HKD = "HKD"
+    ILS = "ILS"
+    INR = "INR"
+    MXN = "MXN"
+    NOK = "NOK"
+    SEK = "SEK"
+    TWD = "TWD"
+    UNKNOWN = "XXX"  # ISO 4217 "no currency": reported in a code not listed above
 
 
 class ReportingStandard(StrEnum):
@@ -32,12 +46,12 @@ class StatementCategory(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class FiscalPeriod:
-    """A reporting period, e.g. FY2023 or Q3 2023."""
+    """A reporting period, e.g. FY2023 or the 3 months to 2023-06-30."""
 
     fiscal_year: int
     start_date: date
     end_date: date
-    period_label: str  # "FY2023", "Q3 2023", etc.
+    period_label: str  # "FY2023", "3M to 2023-06-30", "As of 2023-12-31"
 
     def __post_init__(self) -> None:
         if self.start_date > self.end_date:

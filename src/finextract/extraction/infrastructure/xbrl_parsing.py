@@ -36,6 +36,7 @@ def parse_xbrl_facts(content: bytes) -> list[XbrlFact]:
         return []
 
     contexts = _resolve_contexts(root)
+    currencies = _resolve_currencies(root)
 
     facts = []
     for element in root.iter():
@@ -53,9 +54,23 @@ def parse_xbrl_facts(content: bytes) -> list[XbrlFact]:
                 sign=element.get("sign"),
                 period_start=period[0] if period else None,
                 period_end=period[1] if period else None,
+                currency=currencies.get(element.get("unitRef", "")),
             )
         )
     return facts
+
+
+def _resolve_currencies(root: etree._Element) -> dict[str, str]:
+    """Map unit id -> ISO 4217 code. Only plain iso4217 measures count, so
+    per-share units (a <divide> with no direct <measure>) are left out."""
+    currencies: dict[str, str] = {}
+    for unit in root.iter(f"{{{_XBRLI_NS}}}unit"):
+        measure = unit.find(f"{{{_XBRLI_NS}}}measure")
+        text = (measure.text or "").strip() if measure is not None else ""
+        prefix, _, code = text.partition(":")
+        if prefix.lower() == "iso4217" and unit.get("id"):
+            currencies[unit.get("id", "")] = code.upper()
+    return currencies
 
 
 def entity_name(facts: list[XbrlFact], fallback: str) -> str:

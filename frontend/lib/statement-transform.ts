@@ -7,14 +7,23 @@ const CATEGORY_MAP: Record<StatementCategory, 'is' | 'bs' | 'cf'> = {
   cash_flow: 'cf',
 }
 
+// With several companies, Apple's FY2026 and Microsoft's FY2026 must not share a column.
+export function toColumnLabels(statements: FinancialStatementResponse[]): string[] {
+  const multiCompany = new Set(statements.map((s) => s.company_name)).size > 1
+  return statements.map((s) =>
+    multiCompany ? `${s.company_name} ${s.period_label}` : s.period_label,
+  )
+}
+
 export function toSheetRows(
   statements: FinancialStatementResponse[],
   category: StatementCategory,
 ): SheetRow[] {
   const rowsByField = new Map<string, SheetRow>()
+  const columns = toColumnLabels(statements)
 
-  for (const statement of statements) {
-    const year = statement.period_label
+  for (const [index, statement] of statements.entries()) {
+    const year = columns[index]
     for (const item of statement.line_items ?? []) {
       if (item.category !== category) continue
       let row = rowsByField.get(item.field_name)

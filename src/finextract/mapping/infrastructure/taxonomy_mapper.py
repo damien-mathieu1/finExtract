@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -323,6 +323,14 @@ EDINET_TAG_MAP: dict[str, tuple[str, StatementCategory]] = {
 }
 
 _FULL_YEAR_MIN_DAYS = 350
+_DAYS_PER_MONTH = 30.44
+
+_STANDARD_BY_TAG_PREFIX = {
+    "us-gaap": ReportingStandard.US_GAAP,
+    "ifrs-full": ReportingStandard.IFRS,
+    "jpigp_cor": ReportingStandard.IFRS,
+    "jppfs_cor": ReportingStandard.JAPANESE_GAAP,
+}
 
 
 @dataclass(slots=True)
@@ -333,6 +341,9 @@ class TagTableTaxonomyMapper:
     schema but not lost: they stay retrievable from the RawFiling for
     auditing/debugging. A future adapter (e.g. LLM-assisted mapping for PDF
     extraction) implements the same port with fuzzier matching.
+
+    `currency` and `standard` are fallbacks: both are read from the filing's
+    own facts whenever those say.
     """
 
     tag_map: dict[str, tuple[str, StatementCategory]] = field(
@@ -359,12 +370,16 @@ class TagTableTaxonomyMapper:
                 raw_filing.source_url,
             )
 
+        kept_facts = [fact for facts in by_period.values() for fact in facts]
+        currency = _filing_currency(kept_facts) or self.currency
+        standard = _filing_standard(kept_facts) or self.standard
+
         statements = [
             FinancialStatement(
                 company_name=raw_filing.company_name,
                 fiscal_period=_fiscal_period_for(start, end),
-                currency=self.currency,
-                accounting_standard=self.standard,
+                currency=currency,
+                accounting_standard=standard,
                 line_items=[
                     LineItem(
                         field_name=self.tag_map[fact.tag][0],
@@ -381,6 +396,25 @@ class TagTableTaxonomyMapper:
         return sorted(statements, key=lambda s: s.fiscal_period.fiscal_year)
 
 
+def _filing_currency(facts: list[XbrlFact]) -> Currency | None:
+    codes = Counter(fact.currency for fact in facts if fact.currency)
+    if not codes:
+        return None
+    try:
+        return Currency(codes.most_common(1)[0][0])
+    except ValueError:
+        return Currency.UNKNOWN
+
+
+def _filing_standard(facts: list[XbrlFact]) -> ReportingStandard | None:
+    standards = Counter(
+        _STANDARD_BY_TAG_PREFIX[prefix]
+        for prefix in (fact.tag.partition(":")[0] for fact in facts)
+        if prefix in _STANDARD_BY_TAG_PREFIX
+    )
+    return standards.most_common(1)[0][0] if standards else None
+
+
 def _fiscal_period_for(start: date, end: date) -> FiscalPeriod:
     fiscal_year = end.year
     duration_days = (end - start).days
@@ -389,10 +423,10 @@ def _fiscal_period_for(start: date, end: date) -> FiscalPeriod:
     elif start == end:
         period_label = f"As of {end.isoformat()}"
     else:
-        # Best-effort quarter guess from day-count - not calendar-aware,
-        # just enough to distinguish quarterly from annual periods in labels.
-        quarter = min(duration_days // 90 + 1, 4)
-        period_label = f"Q{quarter} {fiscal_year}"
+        # Length and end date, not "Q2": a quarter number needs the filer's
+        # fiscal calendar, and 10-Qs mix 3-month and year-to-date periods.
+        months = round(duration_days / _DAYS_PER_MONTH)
+        period_label = f"{months}M to {end.isoformat()}"
     return FiscalPeriod(
         fiscal_year=fiscal_year, start_date=start, end_date=end, period_label=period_label
     )

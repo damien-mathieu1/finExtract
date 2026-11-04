@@ -39,7 +39,10 @@ APP_VERSION = os.environ.get("APP_VERSION", "dev")
 # the app still runs with only whichever sources are configured.
 default_taxonomy_mapper = TagTableTaxonomyMapper(tag_map=dict(DEFAULT_TAG_MAP))
 
-extract_uploaded_filing = ExtractUploadedFiling(mapper=default_taxonomy_mapper)
+# Uploads can come from any jurisdiction, so they map against every known tag.
+extract_uploaded_filing = ExtractUploadedFiling(
+    mapper=TagTableTaxonomyMapper(tag_map={**DEFAULT_TAG_MAP, **EDINET_TAG_MAP})
+)
 
 postgres_exporter = PostgresExporter(database_url=DATABASE_URL) if DATABASE_URL else None
 

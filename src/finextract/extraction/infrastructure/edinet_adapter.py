@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -15,6 +16,7 @@ from finextract.shared_kernel.errors import SourceNotFoundError
 
 _CODE_LIST_URL = "https://disclosure2dl.edinet-fsa.go.jp/searchdocument/codelist/Edinetcode.zip"
 _API_BASE = "https://api.edinet-fsa.go.jp/api/v2"
+_DOC_ID = re.compile(r"S[0-9A-Z]{7}")
 
 # EDINET document type codes carrying XBRL financial data (securities
 # reports / annual, quarterly and semi-annual reports). See EDINET API spec
@@ -143,6 +145,9 @@ class EdinetClient:
         return response.json().get("results", []) or []
 
     def fetch_raw_facts(self, source_reference: str) -> RawFiling:
+        # The reference comes from the client and lands in the URL path.
+        if not _DOC_ID.fullmatch(source_reference):
+            raise SourceNotFoundError(f"Not an EDINET docID: '{source_reference}'")
         response = self._client.get(
             f"{_API_BASE}/documents/{source_reference}",
             params={"type": 1, "Subscription-Key": self.api_key},

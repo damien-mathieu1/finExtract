@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { cn, formatAmount } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
 import { getExtraction, combineExtractions, downloadExport, downloadCombinedExport, listExtractions } from '@/lib/api/extractions'
-import { toExtractionResult } from '@/lib/statement-transform'
+import { toColumnLabels, toExtractionResult } from '@/lib/statement-transform'
 import type { SheetRow } from '@/lib/types'
 import { toast } from 'sonner'
 import type { AppPage } from '@/components/app-sidebar'
@@ -125,7 +125,7 @@ export function DataViewerPage({ selectedExtractionIds, onNavigate }: DataViewer
   })
 
   const result = toExtractionResult(statements)
-  const years = Array.from(new Set(statements.map((s) => s.period_label))).sort()
+  const years = Array.from(new Set(toColumnLabels(statements))).sort()
 
   async function handleExport(format: 'excel' | 'csv') {
     if (localIds.length === 0) return
