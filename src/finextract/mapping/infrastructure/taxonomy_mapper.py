@@ -22,14 +22,14 @@ _CF = StatementCategory.CASH_FLOW
 
 # Maps source taxonomy tags (company wording, via us-gaap/ifrs) to a standard
 # schema field name + which statement it belongs to. Extend as new tags/
-# wordings are encountered.
+# wordings are encountered. When a filing reports several tags for one field,
+# the tag listed first wins, so order them by preference.
 DEFAULT_TAG_MAP: dict[str, tuple[str, StatementCategory]] = {
     # Income statement
     "us-gaap:Revenues": ("revenue", _IS),
     "us-gaap:SalesRevenueNet": ("revenue", _IS),
     "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax": ("revenue", _IS),
     "us-gaap:RevenueFromContractWithCustomerIncludingAssessedTax": ("revenue", _IS),
-    "ifrs-full:Revenue": ("revenue", _IS),
     "us-gaap:CostOfRevenue": ("cost_of_revenue", _IS),
     "us-gaap:CostOfGoodsAndServicesSold": ("cost_of_revenue", _IS),
     "us-gaap:CostOfGoodsSold": ("cost_of_revenue", _IS),
@@ -74,7 +74,6 @@ DEFAULT_TAG_MAP: dict[str, tuple[str, StatementCategory]] = {
         _IS,
     ),
     "us-gaap:NetIncomeLoss": ("net_income", _IS),
-    "ifrs-full:ProfitLoss": ("net_income", _IS),
     "us-gaap:EarningsPerShareBasic": ("eps_basic", _IS),
     "us-gaap:EarningsPerShareDiluted": ("eps_diluted", _IS),
     "us-gaap:WeightedAverageNumberOfSharesOutstandingBasic": ("shares_outstanding_basic", _IS),
@@ -153,11 +152,12 @@ DEFAULT_TAG_MAP: dict[str, tuple[str, StatementCategory]] = {
     "us-gaap:RetainedEarningsAccumulatedDeficit": ("retained_earnings", _BS),
     "us-gaap:TreasuryStockValue": ("treasury_stock", _BS),
     "us-gaap:MinorityInterest": ("noncontrolling_interest", _BS),
-    "us-gaap:StockholdersEquity": ("total_equity", _BS),
+    # Including minorities first, so assets = liabilities + total_equity.
     "us-gaap:StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest": (
         "total_equity",
         _BS,
     ),
+    "us-gaap:StockholdersEquity": ("total_equity", _BS),
     "us-gaap:LiabilitiesAndStockholdersEquity": ("total_liabilities_and_equity", _BS),
     # Cash flow statement
     "us-gaap:DepreciationDepletionAndAmortization": ("depreciation_and_amortization", _CF),
@@ -229,6 +229,156 @@ DEFAULT_TAG_MAP: dict[str, tuple[str, StatementCategory]] = {
     ),
     "us-gaap:IncomeTaxesPaidNet": ("income_taxes_paid", _CF),
     "us-gaap:InterestPaidNet": ("interest_paid", _CF),
+    # IFRS (ifrs-full), for 20-F and uploaded filers. Filer extension tags stay
+    # unmapped (Toyota's capex is tm:..., for example).
+    "ifrs-full:Revenue": ("revenue", _IS),
+    "ifrs-full:CostOfSales": ("cost_of_revenue", _IS),
+    "ifrs-full:GrossProfit": ("gross_profit", _IS),
+    "ifrs-full:OtherIncome": ("other_operating_income", _IS),
+    "ifrs-full:ResearchAndDevelopmentExpense": ("research_and_development", _IS),
+    "ifrs-full:SellingGeneralAndAdministrativeExpense": ("sga_expense", _IS),
+    "ifrs-full:OperatingExpense": ("operating_expenses", _IS),
+    "ifrs-full:ProfitLossFromOperatingActivities": ("operating_income", _IS),
+    "ifrs-full:InterestExpense": ("interest_expense", _IS),
+    "ifrs-full:FinanceCosts": ("interest_expense", _IS),
+    "ifrs-full:InterestRevenueCalculatedUsingEffectiveInterestMethod": ("interest_income", _IS),
+    "ifrs-full:GainsLossesOnExchangeDifferencesOnTranslationRecognisedInProfitOrLoss": (
+        "fx_gain_loss",
+        _IS,
+    ),
+    "ifrs-full:ProfitLossBeforeTax": ("profit_before_tax", _IS),
+    "ifrs-full:IncomeTaxExpenseContinuingOperations": ("income_tax_expense", _IS),
+    "ifrs-full:CurrentTaxExpenseIncome": ("current_income_tax", _IS),
+    "ifrs-full:DeferredTaxExpenseIncome": ("deferred_income_tax", _IS),
+    "ifrs-full:DeferredTaxExpenseIncomeRecognisedInProfitOrLoss": ("deferred_income_tax", _IS),
+    "ifrs-full:ProfitLossFromContinuingOperations": ("income_from_continuing_operations", _IS),
+    "ifrs-full:ProfitLossFromDiscontinuedOperations": ("discontinued_operations", _IS),
+    # Attributable to the parent first, matching us-gaap:NetIncomeLoss.
+    "ifrs-full:ProfitLossAttributableToOwnersOfParent": ("net_income", _IS),
+    "ifrs-full:ProfitLoss": ("net_income", _IS),
+    "ifrs-full:ProfitLossAttributableToNoncontrollingInterests": (
+        "net_income_attributable_to_nci",
+        _IS,
+    ),
+    "ifrs-full:BasicEarningsLossPerShare": ("eps_basic", _IS),
+    "ifrs-full:DilutedEarningsLossPerShare": ("eps_diluted", _IS),
+    "ifrs-full:WeightedAverageShares": ("shares_outstanding_basic", _IS),
+    "ifrs-full:AdjustedWeightedAverageShares": ("shares_outstanding_diluted", _IS),
+    "ifrs-full:CashAndCashEquivalents": ("cash_and_equivalents", _BS),
+    "ifrs-full:CurrentInvestments": ("short_term_investments", _BS),
+    "ifrs-full:TradeAndOtherCurrentReceivables": ("accounts_and_notes_receivable", _BS),
+    "ifrs-full:CurrentTradeReceivables": ("accounts_receivable", _BS),
+    "ifrs-full:Inventories": ("inventory", _BS),
+    "ifrs-full:RawMaterials": ("inventory_raw_materials", _BS),
+    "ifrs-full:WorkInProgress": ("inventory_wip", _BS),
+    "ifrs-full:FinishedGoods": ("inventory_finished_goods", _BS),
+    "ifrs-full:OtherCurrentAssets": ("other_current_assets", _BS),
+    "ifrs-full:CurrentPrepaidExpenses": ("prepaid_expenses_current", _BS),
+    "ifrs-full:CurrentAssets": ("total_current_assets", _BS),
+    "ifrs-full:PropertyPlantAndEquipment": ("net_fixed_assets", _BS),
+    "ifrs-full:Goodwill": ("goodwill", _BS),
+    "ifrs-full:IntangibleAssetsOtherThanGoodwill": ("other_intangible_assets", _BS),
+    "ifrs-full:IntangibleAssetsAndGoodwill": ("total_intangibles", _BS),
+    "ifrs-full:DeferredTaxAssets": ("deferred_tax_assets", _BS),
+    "ifrs-full:OtherNoncurrentAssets": ("other_noncurrent_assets", _BS),
+    "ifrs-full:NoncurrentAssets": ("total_noncurrent_assets", _BS),
+    "ifrs-full:Assets": ("total_assets", _BS),
+    "ifrs-full:TradeAndOtherCurrentPayables": ("accounts_payable_and_accrued", _BS),
+    "ifrs-full:TradeAndOtherCurrentPayablesToTradeSuppliers": ("accounts_payable", _BS),
+    "ifrs-full:CurrentTaxLiabilitiesCurrent": ("taxes_payable", _BS),
+    "ifrs-full:CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings": (
+        "short_term_debt",
+        _BS,
+    ),
+    "ifrs-full:ShorttermBorrowings": ("short_term_debt", _BS),
+    "ifrs-full:CurrentPortionOfLongtermBorrowings": ("current_portion_lt_debt", _BS),
+    "ifrs-full:CurrentLeaseLiabilities": ("lease_liabilities_current", _BS),
+    "ifrs-full:CurrentContractLiabilities": ("deferred_revenue_current", _BS),
+    "ifrs-full:OtherCurrentLiabilities": ("other_current_liabilities", _BS),
+    "ifrs-full:CurrentLiabilities": ("total_current_liabilities", _BS),
+    "ifrs-full:LongtermBorrowings": ("long_term_debt", _BS),
+    "ifrs-full:NoncurrentPortionOfNoncurrentBorrowings": ("long_term_debt", _BS),
+    "ifrs-full:NoncurrentLeaseLiabilities": ("lease_liabilities_noncurrent", _BS),
+    "ifrs-full:NoncurrentRecognisedLiabilitiesDefinedBenefitPlan": ("pension_liabilities", _BS),
+    "ifrs-full:DeferredTaxLiabilities": ("deferred_tax_liabilities_noncurrent", _BS),
+    "ifrs-full:OtherNoncurrentLiabilities": ("other_noncurrent_liabilities", _BS),
+    "ifrs-full:NoncurrentLiabilities": ("total_noncurrent_liabilities", _BS),
+    "ifrs-full:Liabilities": ("total_liabilities", _BS),
+    "ifrs-full:IssuedCapital": ("common_stock", _BS),
+    "ifrs-full:AdditionalPaidinCapital": ("additional_paid_in_capital", _BS),
+    "ifrs-full:SharePremium": ("additional_paid_in_capital", _BS),
+    "ifrs-full:TreasuryShares": ("treasury_stock", _BS),
+    "ifrs-full:RetainedEarnings": ("retained_earnings", _BS),
+    "ifrs-full:OtherReserves": ("other_equity", _BS),
+    "ifrs-full:EquityAttributableToOwnersOfParent": ("equity_attributable_to_parent", _BS),
+    "ifrs-full:NoncontrollingInterests": ("noncontrolling_interest", _BS),
+    "ifrs-full:Equity": ("total_equity", _BS),
+    "ifrs-full:EquityAndLiabilities": ("total_liabilities_and_equity", _BS),
+    "ifrs-full:AdjustmentsForDepreciationAndAmortisationExpense": (
+        "depreciation_and_amortization",
+        _CF,
+    ),
+    "ifrs-full:DepreciationAndAmortisationExpense": ("depreciation_and_amortization", _CF),
+    "ifrs-full:AdjustmentsForSharebasedPayments": ("stock_based_compensation", _CF),
+    # Cash-impact sign, unlike the us-gaap IncreaseDecreaseIn* tags.
+    "ifrs-full:AdjustmentsForDecreaseIncreaseInTradeAndOtherReceivables": (
+        "change_in_accounts_receivable",
+        _CF,
+    ),
+    "ifrs-full:AdjustmentsForDecreaseIncreaseInInventories": ("change_in_inventories", _CF),
+    "ifrs-full:AdjustmentsForIncreaseDecreaseInTradeAndOtherPayables": (
+        "change_in_accounts_payable",
+        _CF,
+    ),
+    "ifrs-full:CashFlowsFromUsedInOperatingActivities": ("cash_flow_operating", _CF),
+    "ifrs-full:PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities": ("capex", _CF),
+    "ifrs-full:ProceedsFromSalesOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities": (
+        "disposal_of_ppe",
+        _CF,
+    ),
+    "ifrs-full:PurchaseOfIntangibleAssetsClassifiedAsInvestingActivities": (
+        "acquisition_of_intangible_assets",
+        _CF,
+    ),
+    "ifrs-full:CashFlowsUsedInObtainingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities": (  # noqa: E501
+        "payments_for_acquisitions_subsidiaries",
+        _CF,
+    ),
+    "ifrs-full:OtherInflowsOutflowsOfCashClassifiedAsInvestingActivities": (
+        "other_investing_activities",
+        _CF,
+    ),
+    "ifrs-full:CashFlowsFromUsedInInvestingActivities": ("cash_flow_investing", _CF),
+    "ifrs-full:DividendsPaidClassifiedAsFinancingActivities": ("dividends_paid", _CF),
+    "ifrs-full:DividendsPaidToEquityHoldersOfParentClassifiedAsFinancingActivities": (
+        "dividends_paid",
+        _CF,
+    ),
+    "ifrs-full:CashFlowsFromUsedInIncreaseDecreaseInCurrentBorrowings": (
+        "net_change_in_short_term_debt",
+        _CF,
+    ),
+    "ifrs-full:ProceedsFromNoncurrentBorrowings": ("proceeds_from_lt_debt", _CF),
+    "ifrs-full:ProceedsFromBorrowingsClassifiedAsFinancingActivities": (
+        "proceeds_from_lt_debt",
+        _CF,
+    ),
+    "ifrs-full:RepaymentsOfNoncurrentBorrowings": ("repayment_of_lt_debt", _CF),
+    "ifrs-full:RepaymentsOfBorrowingsClassifiedAsFinancingActivities": (
+        "repayment_of_lt_debt",
+        _CF,
+    ),
+    "ifrs-full:ProceedsFromIssuingShares": ("proceeds_from_stock_issuance", _CF),
+    "ifrs-full:PaymentsToAcquireOrRedeemEntitysShares": ("stock_buybacks", _CF),
+    "ifrs-full:OtherInflowsOutflowsOfCashClassifiedAsFinancingActivities": (
+        "other_financing_activities",
+        _CF,
+    ),
+    "ifrs-full:CashFlowsFromUsedInFinancingActivities": ("cash_flow_financing", _CF),
+    "ifrs-full:EffectOfExchangeRateChangesOnCashAndCashEquivalents": ("fx_effect_on_cash", _CF),
+    "ifrs-full:IncreaseDecreaseInCashAndCashEquivalents": ("net_change_in_cash", _CF),
+    "ifrs-full:IncomeTaxesPaidRefundClassifiedAsOperatingActivities": ("income_taxes_paid", _CF),
+    "ifrs-full:InterestPaidClassifiedAsOperatingActivities": ("interest_paid", _CF),
 }
 
 # EDINET (Japan) filers tag standard consolidated financial statement facts
@@ -388,7 +538,7 @@ class TagTableTaxonomyMapper:
                         original_label=fact.tag,
                         source="XBRL",
                     )
-                    for fact in facts
+                    for fact in _one_fact_per_field(facts, self.tag_map)
                 ],
             )
             for (start, end), facts in by_period.items()
@@ -415,8 +565,32 @@ def _filing_standard(facts: list[XbrlFact]) -> ReportingStandard | None:
     return standards.most_common(1)[0][0] if standards else None
 
 
+def _one_fact_per_field(
+    facts: list[XbrlFact], tag_map: dict[str, tuple[str, StatementCategory]]
+) -> list[XbrlFact]:
+    """A filing repeats a figure across statements and notes, sometimes rounded
+    or under a sibling tag. Keep one per field, in filing order: a real value,
+    then the preferred tag, then the most precise. No decimals means exact."""
+    tag_rank = {tag: rank for rank, tag in enumerate(tag_map)}
+
+    def preference(fact: XbrlFact) -> tuple[bool, int, float]:
+        decimals = float("inf") if fact.decimals is None else fact.decimals
+        return (_to_float(fact) is None, tag_rank[fact.tag], -decimals)
+
+    best: dict[tuple[str, StatementCategory], XbrlFact] = {}
+    for fact in sorted(facts, key=preference):
+        best.setdefault(tag_map[fact.tag], fact)
+    return [fact for fact in facts if best[tag_map[fact.tag]] is fact]
+
+
+def _fiscal_year_for(end: date) -> int:
+    # 52/53-week years ending nearest Dec 31 can spill into January: J&J's
+    # fiscal 2022 ended 2023-01-01 and must not collide with fiscal 2023.
+    return end.year - 1 if end.month == 1 and end.day <= 7 else end.year
+
+
 def _fiscal_period_for(start: date, end: date) -> FiscalPeriod:
-    fiscal_year = end.year
+    fiscal_year = _fiscal_year_for(end)
     duration_days = (end - start).days
     if duration_days >= _FULL_YEAR_MIN_DAYS:
         period_label = f"FY{fiscal_year}"

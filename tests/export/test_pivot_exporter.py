@@ -78,3 +78,16 @@ def test_pivot_excel_exporter_writes_three_sheets() -> None:
     workbook = openpyxl.load_workbook(io.BytesIO(payload))
 
     assert workbook.sheetnames == ["PL", "BS", "CS"]
+
+
+def test_overlapping_filings_share_one_column_and_first_statement_wins() -> None:
+    older = _statement(2024, revenue=100.0)
+    newer = _statement(2024, revenue=120.0)
+
+    payload = PivotExcelExporter().export([older, newer])
+
+    sheet = openpyxl.load_workbook(io.BytesIO(payload))["PL"]
+    header = [cell.value for cell in sheet[3]]
+    assert header.count("FY2024") == 1
+    revenue_row = next(row for row in sheet.iter_rows(min_row=4) if row[2].value == "revenue")
+    assert revenue_row[header.index("FY2024")].value == 100

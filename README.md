@@ -76,6 +76,7 @@ FastAPI, SQLAlchemy, Alembic, lxml, pandas and openpyxl on the backend. Next.js,
 ## Known gaps
 
 - XBRL only: no PDF or OCR extraction.
+- IFRS filers: only standard `ifrs-full` tags are mapped, so a filer's own extension tags (Toyota's capex, for example) stay out.
 - The tag map is applied at extraction time, so re-extract a filing to benefit from a tag map update.
 - SEC EDGAR only covers 10-K, 10-Q, 20-F and 40-F forms.
 - IFRS coverage is thin: filers such as Toyota or SAP get under 10 fields per period, against about 50 for US GAAP.

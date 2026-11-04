@@ -31,7 +31,8 @@ export function toSheetRows(
         row = { label: item.field_name, xbrlTag: item.original_label }
         rowsByField.set(item.field_name, row)
       }
-      if (item.value !== null) row[year] = item.value
+      // First value wins, like the exports: overlapping filings repeat a period.
+      if (item.value !== null && row[year] === undefined) row[year] = item.value
     }
   }
 
