@@ -1,0 +1,106 @@
+name: Create Release
+
+# Click "Run workflow" in Actions. Version is CalVer vYYYY.M.N (N = release
+# number in the current month, starting at 1), e.g. v2026.11.1, v2026.11.2.
+# Runs CI, tags and writes the changelog, then deploys that tag to Cloud Run.
+on:
+  workflow_dispatch:
+
+# Serialize releases so two runs can never compute the same tag.
+concurrency:
+  group: create-release
+  cancel-in-progress: false
+
+# Deny all permissions by default — each job opts in to exactly what it needs.
+permissions: {}
+
+jobs:
+  test:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  create-release:
+    name: Create GitHub Release
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Compute CalVer version
+        id: version
+        run: |
+          # fetch-depth: 0 above already pulled every tag.
+          PREFIX="v$(date -u +%Y).$(date -u +%-m)"
+          LAST=$(git tag --list "${PREFIX}.*" | awk -F. '{print $NF}' | grep -E '^[0-9]+$' | sort -n | tail -1 || true)
+          VERSION="${PREFIX}.$(( ${LAST:-0} + 1 ))"
+          echo "Next version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog
+        uses: orhun/git-cliff-action@f50e11560dce63f7c33227798f90b924471a88b5 # v4
+        with:
+          config: cliff.toml
+          args: --unreleased --strip all --tag ${{ steps.version.outputs.version }}
+        env:
+          OUTPUT: changelog_fragment.md
+          GITHUB_REPO: ${{ github.repository }}
+
+      - name: Build release body
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          GENERATED=$(gh api repos/${{ github.repository }}/releases/generate-notes \
+            --method POST \
+            --field tag_name=${{ steps.version.outputs.version }} \
+            --jq '.body')
+
+          CONTRIBUTORS=$(echo "$GENERATED" | awk '/^## New Contributors/{found=1} found{print}' | grep -v "^\*\*Full Changelog" || true)
+          FULL_CHANGELOG=$(echo "$GENERATED" | grep "^\*\*Full Changelog" || true)
+
+          {
+            echo "# FinExtract ${{ steps.version.outputs.version }}"
+            echo ""
+            cat changelog_fragment.md
+            echo ""
+            if [ -n "$CONTRIBUTORS" ]; then
+              echo "$CONTRIBUTORS"
+              echo ""
+            fi
+            if [ -n "$FULL_CHANGELOG" ]; then
+              echo "$FULL_CHANGELOG"
+            fi
+          } > release_body.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          body_path: release_body.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Called directly: a release created with GITHUB_TOKEN never fires `on: release`.
+  deploy:
+    name: Deploy
+    needs: create-release
+    uses: ./.github/workflows/deploy.yml
+    with:
+      tag: ${{ needs.create-release.outputs.version }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    secrets: inherit

@@ -1,32 +1,52 @@
 name: Deploy
 
+# Called by create-release.yml. Run it by hand with an existing tag to roll back.
 on:
-  release:
-    types: [published]
-  workflow_dispatch: {}
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to deploy, e.g. v2026.11.1
+        required: true
+        type: string
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
 
 env:
   REGISTRY: ghcr.io
   GCP_REGION: us-central1
 
-permissions:
-  contents: read
-  packages: write
-  id-token: write
+# Deny all permissions by default — each job opts in to exactly what it needs.
+permissions: {}
 
 jobs:
   build-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     outputs:
       api_image: ${{ steps.tags.outputs.api_image }}
       frontend_image: ${{ steps.tags.outputs.frontend_image }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
 
       - id: tags
+        env:
+          TAG: ${{ inputs.tag }}
         run: |
-          TAG="${GITHUB_SHA::12}"
           REPO="$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+          echo "api_repo=${REGISTRY}/${REPO}-api" >> "$GITHUB_OUTPUT"
+          echo "frontend_repo=${REGISTRY}/${REPO}-frontend" >> "$GITHUB_OUTPUT"
           echo "api_image=${REGISTRY}/${REPO}-api:${TAG}" >> "$GITHUB_OUTPUT"
           echo "frontend_image=${REGISTRY}/${REPO}-frontend:${TAG}" >> "$GITHUB_OUTPUT"
 
@@ -43,7 +63,11 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.tags.outputs.api_image }}
+          tags: |
+            ${{ steps.tags.outputs.api_image }}
+            ${{ steps.tags.outputs.api_repo }}:latest
+          build-args: |
+            APP_VERSION=${{ inputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -53,7 +77,9 @@ jobs:
           context: ./frontend
           target: prod
           push: true
-          tags: ${{ steps.tags.outputs.frontend_image }}
+          tags: |
+            ${{ steps.tags.outputs.frontend_image }}
+            ${{ steps.tags.outputs.frontend_repo }}:latest
           build-args: |
             NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           cache-from: type=gha,scope=frontend
@@ -62,6 +88,9 @@ jobs:
   deploy:
     needs: build-push
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - id: auth
         uses: google-github-actions/auth@v2
