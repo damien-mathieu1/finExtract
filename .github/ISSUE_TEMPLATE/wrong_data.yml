@@ -1,0 +1,25 @@
+name: Wrong number
+description: An extracted or exported value does not match the filing.
+labels: [bug, data]
+body:
+  - type: input
+    id: filing
+    attributes:
+      label: Company and filing
+      placeholder: e.g. Apple 10-K filed 2026-11-03
+    validations:
+      required: true
+  - type: input
+    id: field
+    attributes:
+      label: Field and period
+      placeholder: e.g. revenue, FY2026
+    validations:
+      required: true
+  - type: textarea
+    id: values
+    attributes:
+      label: Value shown and value expected
+      description: Where the expected value appears in the filing, if you can.
+    validations:
+      required: true

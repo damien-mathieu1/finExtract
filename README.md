@@ -1,29 +1,62 @@
 # FinExtract
 
-Pulls financial statements out of official company filings (SEC EDGAR for
-the US, EDINET for Japan) via their XBRL/iXBRL data, normalizes them into a
-common schema across US GAAP / Japanese GAAP / IFRS, and exports clean
-CSV/Excel — so you don't have to copy numbers out of a PDF by hand.
+Financial statements from official company filings, without copying numbers out of a PDF by hand.
 
-FastAPI backend + Next.js frontend, Clerk auth, Postgres for extraction
-history.
+**Try it: [finextract.dmathieu.dev](https://finextract.dmathieu.dev)**
+
+![FinExtract demo: search Apple, extract its latest 10-K, merge it with an older filing, then view the statements and charts](docs/demo.gif)
+
+Search a company, pick a filing, and FinExtract reads its XBRL data straight from the regulator. Income statement, balance sheet and cash flow come out in one common schema, ready for Excel, CSV or JSON.
+
+## Features
+
+- Official sources: SEC EDGAR (US) and EDINET (Japan), or upload your own XBRL/iXBRL file
+- One standard field set across US GAAP, Japanese GAAP and IFRS tags (`us-gaap:Revenues`, `jppfs_cor:NetSales`, ... become `revenue`)
+- Merge several filings into one multi-year view, with the original XBRL tag kept next to each value
+- Charts: bar, line and area, across any metrics and periods
+- Export to CSV or a styled Excel workbook (income statement, balance sheet and cash flow sheets, optional native chart sheet)
+- Saved extraction history, private to your account
+- English, French and Japanese interface
+
+## Screenshots
+
+| Multi-year statements              | Charts                               |
+| ---------------------------------- | ------------------------------------ |
+| ![Data viewer](docs/viewer.png)    | ![Figures](docs/figures.png)         |
+
+| Extraction history                      | Landing page                     |
+| --------------------------------------- | -------------------------------- |
+| ![Extractions](docs/extractions.png)    | ![Landing](docs/landing.png)     |
+
+## Getting started
+
+Requires Docker, a free [Clerk](https://clerk.com) dev instance, and optionally a free [EDINET API key](https://api.edinet-fsa.go.jp/api/auth/index.aspx?mode=1).
+
+```bash
+cp .env.example .env   # fill in the Clerk keys and your SEC User-Agent
+docker compose up --build
+```
+
+Then open http://localhost:3000. API docs are at http://localhost:8000/docs.
+
+## Commands
+
+| Command                                 | What it does                   |
+| --------------------------------------- | ------------------------------ |
+| `uv sync`                               | Install the backend            |
+| `uv run pytest`                         | Run the tests                  |
+| `uv run ruff check .`                   | Lint                           |
+| `uv run ruff format .`                  | Format                         |
+| `uv run uvicorn finextract.main:app --reload` | Start the API            |
+| `pnpm dev` (in `frontend/`)             | Start the frontend             |
+| `pnpm typecheck` (in `frontend/`)       | Type-check with tsc            |
+| `pnpm build` (in `frontend/`)           | Production build               |
 
 ## How it works
 
-1. **Extract** — fetch a filing's raw XBRL facts (SEC EDGAR, EDINET, or a
-   user-uploaded XBRL file).
-2. **Map** — translate filer-specific tags (`us-gaap:Revenues`,
-   `jppfs_cor:NetSales`, ...) into a standard field set (`revenue`,
-   `net_income`, ...) via a static tag lookup table.
-3. **Export** — serve the normalized statement as JSON, or as a
-   Bloomberg-style CSV/Excel workbook (styled PL/BS/CS sheets, optional
-   chart sheet), or persist it to Postgres as extraction history.
-
-## Architecture
-
-DDD bounded contexts with hexagonal (ports & adapters) boundaries, all
-inside one FastAPI service — each context could become its own deployable
-service later without touching domain logic.
+1. **Extract**: fetch a filing's raw XBRL facts from SEC EDGAR, EDINET or an uploaded file.
+2. **Map**: translate filer-specific tags into the standard field set with a static tag table. Dimensional facts (revenue by product line, for example) are left out, so only consolidated totals reach the statement.
+3. **Export**: serve the statement as JSON, CSV or Excel, and save it to Postgres as extraction history.
 
 ```
 src/finextract/
@@ -31,73 +64,33 @@ src/finextract/
 ├── extraction/       # get raw XBRL facts from a filing
 ├── mapping/          # normalize raw facts into the standard schema
 ├── export/           # write the standard schema to CSV/Excel/Postgres
-└── interfaces/http/  # FastAPI routes (driving adapter)
+└── interfaces/http/  # FastAPI routes
 ```
 
-Each context: `domain/` (entities + `ports.py`, no framework imports) →
-`application/` (use cases) → `infrastructure/` (adapters: XBRL parser,
-tag map, CSV/Excel/Postgres writers). Infrastructure depends on domain
-ports, never the reverse.
+Each context is split into `domain/` (entities and ports, no framework imports), `application/` (use cases) and `infrastructure/` (adapters). `frontend/` is a separate Next.js app.
 
-`frontend/` is a separate Next.js app (App Router) — filing search, saved
-extractions, a data viewer, and charts with Excel export.
+## Stack
 
-## API
-
-- `GET /companies/search?q=apple&source=sec-edgar|edinet` — search companies
-- `GET /companies/{identifier}/filings?source=...` — list a company's filings
-- `POST /filings/process?document_url=...&source=...&format=json|csv|excel` — extract + persist one filing
-- `POST /filings/upload` — same pipeline for a user-uploaded XBRL file
-- `GET /extractions` — list saved extractions (owner-scoped)
-- `GET /extractions/{id}?format=...` / `GET /extractions/combine?ids=...&format=...` — fetch or export one/many
-- `GET /extractions/figures?ids=...&metric=...&chart_type=...` — export with a native Excel chart sheet
-- `DELETE /extractions/{id}` / `DELETE /extractions?ids=...` — delete one or many
-
-All routes except `/` and `/sign-in` require a Clerk session; SEC EDGAR
-endpoints also need `SEC_EDGAR_USER_AGENT` set (SEC rejects anonymous
-requests), EDINET needs `EDINET_API_KEY`. Auto-generated docs at `/docs`.
-
-## Running locally
-
-Quickest path — full stack (Postgres + API + frontend) via Docker:
-
-```bash
-cp .env.example .env   # fill in Clerk + SEC/EDINET keys
-docker compose up --build
-# frontend: http://localhost:3000
-# API docs: http://localhost:8000/docs
-```
-
-Backend-only, using [uv](https://docs.astral.sh/uv/):
-
-```bash
-uv sync
-uv run pre-commit install   # one-time: lint/format on every commit
-uv run pytest
-uv run uvicorn finextract.main:app --reload
-```
-
-## Deployment
-
-GCP Cloud Run (api + frontend), provisioned via OpenTofu, deployed on every
-GitHub Release via `.github/workflows/deploy.yml`. Postgres is
-[Neon](https://neon.tech). Full detail in [`infra/README.md`](infra/README.md).
-
-```bash
-cd infra
-cp terraform.tfvars.example terraform.tfvars   # fill in real values
-tofu init && tofu apply
-```
-
-**Before going live**: set up [GCP budget alerts + budget actions](https://cloud.google.com/billing/docs/how-to/budgets) —
-actual protection against a runaway bill, unlike a limited-balance card
-(which only blocks the charge after the fact).
+FastAPI, SQLAlchemy, Alembic, lxml, pandas and openpyxl on the backend. Next.js, Tailwind CSS v4, shadcn/ui and Recharts on the frontend. Clerk for auth, Postgres (Neon) for history, GCP Cloud Run provisioned with OpenTofu.
 
 ## Known gaps
 
-- PDF/OCR extraction isn't implemented (XBRL only for now).
-- Only extractions made *after* a given tag-map update get the benefit of
-  it — the tag map is applied at extraction time, not retroactively on
-  re-export, and raw XBRL facts aren't kept, so re-extracting is the only
-  way to backfill an older saved extraction.
-- Only 10-K/10-Q/20-F/40-F form types are considered on SEC EDGAR.
+- XBRL only: no PDF or OCR extraction.
+- The tag map is applied at extraction time, so re-extract a filing to benefit from a tag map update.
+- SEC EDGAR only covers 10-K, 10-Q, 20-F and 40-F forms.
+
+## Contributing
+
+Issues and pull requests are welcome: see [CONTRIBUTING.md](.github/CONTRIBUTING.md). Security reports go through [SECURITY.md](.github/SECURITY.md).
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org) (`feat:`, `fix:`, `chore:`, ...), checked by a pre-commit hook and in CI.
+
+CI runs the dependency audits, ruff, pytest, typecheck and the frontend build. Releases are created by running the **Create Release** workflow by hand: it runs CI, tags a CalVer version (`vYYYY.M.N`), writes the changelog with git-cliff, then deploys that tag to Cloud Run. Details in [`infra/README.md`](infra/README.md).
+
+## Data sources
+
+FinExtract is an independent project with no link to the SEC or the Japanese FSA. Check figures against the original filing before relying on them; nothing here is investment advice.
+
+## License
+
+[MIT](LICENSE)
