@@ -5,10 +5,10 @@ import { useQuery } from '@tanstack/react-query'
 import { Download, Eye, ChevronDown, BarChart2, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
+import { cn, formatAmount } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
 import { getExtraction, combineExtractions, downloadExport, downloadCombinedExport, listExtractions } from '@/lib/api/extractions'
-import { toExtractionResult } from '@/lib/statement-transform'
+import { toColumnLabels, toExtractionResult } from '@/lib/statement-transform'
 import type { SheetRow } from '@/lib/types'
 import { toast } from 'sonner'
 import type { AppPage } from '@/components/app-sidebar'
@@ -29,15 +29,13 @@ const SHEET_META: Record<SheetKey, { color: string; bgColor: string }> = {
 function formatNum(val: string | number) {
   if (typeof val === 'string') return val
   if (val === 0) return '—'
-  const abs = Math.abs(val)
-  const sign = val < 0 ? '-' : ''
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000).toLocaleString(undefined, { maximumFractionDigits: 0 })}M`
-  if (abs >= 1_000) return `${sign}$${abs.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-  return `${sign}${val}`
+  return formatAmount(val)
 }
 
-function DataTable({ rows, years }: { rows: SheetRow[]; years: string[] }) {
+function DataTable({ rows, years: allYears }: { rows: SheetRow[]; years: string[] }) {
   const { t } = useTranslation()
+  // Each period only feeds some sheets (e.g. "As of" dates only the balance sheet).
+  const years = allYears.filter((year) => rows.some((row) => row[year] !== undefined))
   if (rows.length === 0) {
     return (
       <p className="text-xs text-muted-foreground py-8 text-center">
@@ -127,7 +125,7 @@ export function DataViewerPage({ selectedExtractionIds, onNavigate }: DataViewer
   })
 
   const result = toExtractionResult(statements)
-  const years = Array.from(new Set(statements.map((s) => s.period_label))).sort()
+  const years = Array.from(new Set(toColumnLabels(statements))).sort()
 
   async function handleExport(format: 'excel' | 'csv') {
     if (localIds.length === 0) return

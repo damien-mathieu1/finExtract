@@ -30,6 +30,7 @@ CLERK_ISSUER = os.environ.get("CLERK_ISSUER")
 CLERK_AUTHORIZED_PARTIES = os.environ.get("CLERK_AUTHORIZED_PARTIES")
 DAILY_EXTRACTION_QUOTA = int(os.environ.get("DAILY_EXTRACTION_QUOTA", "20"))
 AUTH_DISABLED = os.environ.get("AUTH_DISABLED", "").lower() in ("1", "true", "yes")
+APP_VERSION = os.environ.get("APP_VERSION", "dev")
 
 # Composition root: wire concrete adapters into use cases via constructor
 # injection. Each government XBRL source gets its own FilingDirectoryPort +
@@ -38,7 +39,10 @@ AUTH_DISABLED = os.environ.get("AUTH_DISABLED", "").lower() in ("1", "true", "ye
 # the app still runs with only whichever sources are configured.
 default_taxonomy_mapper = TagTableTaxonomyMapper(tag_map=dict(DEFAULT_TAG_MAP))
 
-extract_uploaded_filing = ExtractUploadedFiling(mapper=default_taxonomy_mapper)
+# Uploads can come from any jurisdiction, so they map against every known tag.
+extract_uploaded_filing = ExtractUploadedFiling(
+    mapper=TagTableTaxonomyMapper(tag_map={**DEFAULT_TAG_MAP, **EDINET_TAG_MAP})
+)
 
 postgres_exporter = PostgresExporter(database_url=DATABASE_URL) if DATABASE_URL else None
 
@@ -98,7 +102,7 @@ if EDINET_API_KEY:
         source=edinet_client, mapper=edinet_taxonomy_mapper
     )
 
-app = FastAPI(title="FinExtract", version="0.1.0")
+app = FastAPI(title="FinExtract", version=APP_VERSION)
 app.include_router(
     build_router(
         verify_user=verify_user,
@@ -118,4 +122,4 @@ app.include_router(
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return {"status": "ok", "version": APP_VERSION}

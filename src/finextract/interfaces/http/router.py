@@ -33,6 +33,9 @@ from finextract.shared_kernel.value_objects import StatementCategory
 
 router = APIRouter()
 
+# Sized to fit a parsed lxml tree in the Cloud Run instance's memory.
+_MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+
 _EXPORT_MEDIA_TYPES = {
     ExportFormat.CSV: "text/csv",
     ExportFormat.EXCEL: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -149,7 +152,7 @@ def build_router(
         return normalizer
 
     @router.post("/filings/upload", response_model=None)
-    async def upload_filing(
+    def upload_filing(
         file: Annotated[UploadFile, File()],
         user_id: str = Depends(verify_user),
         format: ExportFormat = ExportFormat.JSON,
@@ -158,7 +161,9 @@ def build_router(
         if extract_uploaded_filing is None:
             raise HTTPException(status_code=503, detail="Upload extraction not configured")
         _enforce_quota(user_id)
-        content = await file.read()
+        content = file.file.read(_MAX_UPLOAD_BYTES + 1)
+        if len(content) > _MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="File too large (25 MB maximum)")
         filename = file.filename or "upload.xbrl"
         statements = extract_uploaded_filing(filename, content)
         if extraction_persister is not None:

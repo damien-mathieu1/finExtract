@@ -29,9 +29,12 @@ ghcr.io images unauthenticated). Package settings -> Change visibility.
 
 ## Deploying
 
-`.github/workflows/deploy.yml` runs on GitHub Release publish (or manual
-dispatch): builds+pushes both images to ghcr.io, then `gcloud run deploy`
-each service with the new image tag. OpenTofu owns the service shell/secrets/
+Run the **Create Release** workflow by hand from `main`: it runs CI, tags a
+CalVer version (`vYYYY.M.N`), writes the changelog, then calls
+`.github/workflows/deploy.yml`, which builds+pushes both images to ghcr.io
+(tagged with the version and `latest`) and `gcloud run deploy`s each service.
+To roll back, run **Deploy** by hand with an older tag. `GET /health` on the
+api returns the running version. OpenTofu owns the service shell/secrets/
 IAM; it isn't re-applied on every deploy (`lifecycle.ignore_changes` on the
 image so `tofu apply` won't fight the CI-deployed revision).
 

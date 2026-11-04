@@ -18,7 +18,7 @@ import {
 } from 'recharts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { cn, formatAmount } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
 import { listExtractions, getExtraction, downloadFigureExport } from '@/lib/api/extractions'
 import type { ExtractionSummaryResponse, FinancialStatementResponse } from '@/lib/api/types'
@@ -78,20 +78,6 @@ function groupByFiling(extractions: ExtractionSummaryResponse[]) {
   }))
 }
 
-function formatYAxis(val: number) {
-  const abs = Math.abs(val)
-  if (abs >= 1_000_000) return `${val < 0 ? '-' : ''}$${(abs / 1_000).toFixed(0)}M`
-  if (abs >= 1_000) return `${val < 0 ? '-' : ''}$${abs.toFixed(0)}`
-  return `${val}`
-}
-
-function formatTooltipVal(val: number) {
-  const abs = Math.abs(val)
-  const sign = val < 0 ? '-' : ''
-  if (abs >= 1_000) return `${sign}$${abs.toLocaleString(undefined, { maximumFractionDigits: 0 })}M`
-  return `${sign}${val}`
-}
-
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
@@ -104,7 +90,7 @@ function CustomTooltip({ active, payload, label }: any) {
             <span className="truncate">{p.name}</span>
           </span>
           <span className="font-medium text-foreground tabular-nums shrink-0">
-            {formatTooltipVal(p.value)}
+            {formatAmount(p.value)}
           </span>
         </div>
       ))}
@@ -332,6 +318,8 @@ export function ChartsPage({ initialSelectedIds = [] }: ChartsPageProps) {
   useEffect(() => {
     if (hasAppliedDefaultMetrics.current) return
     if (initialSelectedIds.length === 0 || availableMetrics.length === 0) return
+    // Wait for every statement, or the first to load (often a balance sheet) decides.
+    if (statements.length < initialSelectedIds.length) return
     hasAppliedDefaultMetrics.current = true
 
     const byField = new Map(availableMetrics.map((m) => [m.label, m]))
@@ -340,7 +328,7 @@ export function ChartsPage({ initialSelectedIds = [] }: ChartsPageProps) {
     )
     const picked = defaults.length > 0 ? defaults : availableMetrics.slice(0, 1)
     setSelectedMetrics(new Set(picked.map((m) => m.xbrlTag)))
-  }, [availableMetrics, initialSelectedIds])
+  }, [availableMetrics, initialSelectedIds, statements.length])
 
   const chartData = useMemo(() => {
     const years = Array.from(new Set(statements.map((s) => s.period_label))).sort()
@@ -357,7 +345,7 @@ export function ChartsPage({ initialSelectedIds = [] }: ChartsPageProps) {
         }
       }
       return point
-    })
+    }).filter((point) => Object.keys(point).length > 1)
   }, [statements, selectedMetrics, multiCompany])
 
   const seriesKeys = useMemo(() => {
@@ -499,7 +487,7 @@ export function ChartsPage({ initialSelectedIds = [] }: ChartsPageProps) {
                     tickLine={false}
                   />
                   <YAxis
-                    tickFormatter={formatYAxis}
+                    tickFormatter={formatAmount}
                     tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
                     axisLine={false}
                     tickLine={false}
@@ -565,7 +553,7 @@ export function ChartsPage({ initialSelectedIds = [] }: ChartsPageProps) {
                             tickLine={false}
                           />
                           <YAxis
-                            tickFormatter={formatYAxis}
+                            tickFormatter={formatAmount}
                             tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }}
                             axisLine={false}
                             tickLine={false}

@@ -5,8 +5,10 @@ from dataclasses import dataclass, field
 import httpx
 
 from finextract.extraction.domain.models import CompanySummary, FilingSummary, RawFiling
-from finextract.extraction.infrastructure.xbrl_parsing import parse_xbrl_facts
+from finextract.extraction.infrastructure.xbrl_parsing import entity_name, parse_xbrl_facts
 from finextract.shared_kernel.errors import SourceNotFoundError
+
+_ARCHIVES_URL = "https://www.sec.gov/Archives/"
 
 # SEC EDGAR forms known to carry XBRL financial data.
 XBRL_FORM_TYPES = {"10-K", "10-Q", "10-K/A", "10-Q/A", "20-F", "40-F"}
@@ -93,6 +95,9 @@ class SecEdgarClient:
         return filings
 
     def fetch_raw_facts(self, source_reference: str) -> RawFiling:
+        # The reference comes from the client: never fetch anything but EDGAR.
+        if not source_reference.startswith(_ARCHIVES_URL):
+            raise SourceNotFoundError(f"Not a SEC EDGAR document: '{source_reference}'")
         response = self._client.get(source_reference)
         if response.status_code == 404:
             raise SourceNotFoundError(f"No filing document found at '{source_reference}'")
@@ -101,7 +106,7 @@ class SecEdgarClient:
         facts = parse_xbrl_facts(response.content)
         return RawFiling(
             company_identifier=source_reference,
-            company_name=source_reference,
+            company_name=entity_name(facts, source_reference),
             source_url=source_reference,
             facts=facts,
         )

@@ -18,3 +18,4 @@ __pycache__/
 !*.tfvars.example
 crash.log
 crash.*.log
+.coverage

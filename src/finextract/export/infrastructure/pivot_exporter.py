@@ -29,14 +29,24 @@ class FigureSpec:
     title: str = "Figure"
 
 
+def _is_multi_company(statements: list[FinancialStatement]) -> bool:
+    return len({s.company_name for s in statements}) > 1
+
+
+def _column_label(statement: FinancialStatement, multi_company: bool) -> str:
+    """Period alone is enough for one company; with several, Apple's FY2026
+    and Microsoft's FY2026 must not share a column."""
+    period = statement.fiscal_period.period_label
+    return f"{statement.company_name} {period}" if multi_company else period
+
+
 def build_pivot_dataframe(statements: list[FinancialStatement]) -> pd.DataFrame:
     """Builds a wide table: one row per (category, field_name), one column
-    per distinct period_label found across the given statements, sorted by
-    fiscal_year. Statements are expected to belong to the same company but
-    this isn't enforced - callers (the combine endpoint) decide what's a
-    sensible selection."""
+    per distinct period found across the given statements, sorted by
+    fiscal_year. Several companies get separate columns (see _column_label)."""
+    multi_company = _is_multi_company(statements)
     ordered_labels = [
-        s.fiscal_period.period_label
+        _column_label(s, multi_company)
         for s in sorted(statements, key=lambda s: s.fiscal_period.fiscal_year)
     ]
 
@@ -44,7 +54,7 @@ def build_pivot_dataframe(statements: list[FinancialStatement]) -> pd.DataFrame:
         {
             "category": li.category.value,
             "field_name": li.field_name,
-            "period_label": statement.fiscal_period.period_label,
+            "period_label": _column_label(statement, multi_company),
             "value": li.value,
         }
         for statement in statements
@@ -221,7 +231,8 @@ def _write_figure_sheet(
     embedded image) so it stays editable/re-themeable in Excel."""
     labels = _figure_sheet_labels()
     ordered_statements = sorted(statements, key=lambda s: s.fiscal_period.fiscal_year)
-    periods = list(dict.fromkeys(s.fiscal_period.period_label for s in ordered_statements))
+    multi_company = _is_multi_company(statements)
+    periods = list(dict.fromkeys(_column_label(s, multi_company) for s in ordered_statements))
 
     ws = wb.create_sheet("Figure")
     header = ["Period"] + [
@@ -237,7 +248,7 @@ def _write_figure_sheet(
         for field_name, category in figure.metrics:
             value = None
             for statement in ordered_statements:
-                if statement.fiscal_period.period_label != period:
+                if _column_label(statement, multi_company) != period:
                     continue
                 for li in statement.line_items:
                     if li.field_name == field_name and li.category == category:
@@ -281,7 +292,7 @@ class PivotExcelExporter:
     def export(
         self, statements: list[FinancialStatement], figure: FigureSpec | None = None
     ) -> bytes:
-        company_name = statements[0].company_name if statements else ""
+        company_name = " / ".join(dict.fromkeys(s.company_name for s in statements))
         standards = {s.accounting_standard.value.replace("_", " ") for s in statements}
         currencies = {s.currency.value for s in statements}
         subtitle = f"{' / '.join(sorted(standards))} · {' / '.join(sorted(currencies))}"

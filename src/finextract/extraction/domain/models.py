@@ -20,6 +20,8 @@ class XbrlFact:
     # None when the context couldn't be found/parsed.
     period_start: date | None = None
     period_end: date | None = None
+    # ISO 4217 code from the fact's <xbrli:unit>; None for non-monetary units.
+    currency: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
