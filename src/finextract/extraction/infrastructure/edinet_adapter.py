@@ -10,7 +10,7 @@ from datetime import date, timedelta
 import httpx
 
 from finextract.extraction.domain.models import CompanySummary, FilingSummary, RawFiling
-from finextract.extraction.infrastructure.xbrl_parsing import parse_xbrl_facts
+from finextract.extraction.infrastructure.xbrl_parsing import entity_name, parse_xbrl_facts
 from finextract.shared_kernel.errors import SourceNotFoundError
 
 _CODE_LIST_URL = "https://disclosure2dl.edinet-fsa.go.jp/searchdocument/codelist/Edinetcode.zip"
@@ -155,7 +155,7 @@ class EdinetClient:
         facts = parse_xbrl_facts(xbrl_bytes)
         return RawFiling(
             company_identifier=source_reference,
-            company_name=source_reference,
+            company_name=entity_name(facts, source_reference),
             source_url=source_reference,
             facts=facts,
         )

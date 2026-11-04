@@ -353,8 +353,8 @@ class TagTableTaxonomyMapper:
             by_period[(fact.period_start, fact.period_end)].append(fact)
 
         if dropped:
-            logger.warning(
-                "Dropped %d fact(s) from %s: unresolved XBRL period (no matching context)",
+            logger.info(
+                "Dropped %d fact(s) from %s: dimensional or unresolved XBRL context",
                 dropped,
                 raw_filing.source_url,
             )

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import httpx
 
 from finextract.extraction.domain.models import CompanySummary, FilingSummary, RawFiling
-from finextract.extraction.infrastructure.xbrl_parsing import parse_xbrl_facts
+from finextract.extraction.infrastructure.xbrl_parsing import entity_name, parse_xbrl_facts
 from finextract.shared_kernel.errors import SourceNotFoundError
 
 # SEC EDGAR forms known to carry XBRL financial data.
@@ -101,7 +101,7 @@ class SecEdgarClient:
         facts = parse_xbrl_facts(response.content)
         return RawFiling(
             company_identifier=source_reference,
-            company_name=source_reference,
+            company_name=entity_name(facts, source_reference),
             source_url=source_reference,
             facts=facts,
         )

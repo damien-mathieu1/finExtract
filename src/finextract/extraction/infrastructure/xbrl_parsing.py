@@ -8,6 +8,11 @@ from finextract.extraction.domain.models import XbrlFact
 
 _PARSER = etree.XMLParser(recover=True, huge_tree=True)
 _XBRLI_NS = "http://www.xbrl.org/2003/instance"
+_ENTITY_NAME_TAGS = (
+    "dei:EntityRegistrantName",
+    "jpdei_cor:FilerNameInEnglishDEI",
+    "jpdei_cor:FilerNameInJapaneseDEI",
+)
 
 
 def parse_xbrl_facts(content: bytes) -> list[XbrlFact]:
@@ -53,6 +58,12 @@ def parse_xbrl_facts(content: bytes) -> list[XbrlFact]:
     return facts
 
 
+def entity_name(facts: list[XbrlFact], fallback: str) -> str:
+    """The filer's name as stated in the filing's own cover-page facts."""
+    by_tag = {fact.tag: fact.value for fact in facts if fact.value}
+    return next((by_tag[tag] for tag in _ENTITY_NAME_TAGS if tag in by_tag), fallback)
+
+
 def _resolve_contexts(root: etree._Element) -> dict[str, tuple[date, date]]:
     """Map contextRef id -> (period_start, period_end) by reading each
     filing's <xbrli:context> definitions. Instant periods (balance-sheet
@@ -62,16 +73,23 @@ def _resolve_contexts(root: etree._Element) -> dict[str, tuple[date, date]]:
     dropped from the map; facts referencing them simply get no period
     resolved (see XbrlFact.period_start/period_end == None).
 
-    Only <period> is read - <entity>/<segment>/<scenario> (dimensional
-    qualifiers, e.g. segment reporting) are ignored, so dimensional contexts
-    sharing a base period collapse onto that same (start, end) key. This is
-    intentional: the mapping layer groups facts by resolved period, and
-    dimensional breakdowns aren't part of the current flat schema.
+    Dimensional contexts (<segment>/<scenario>, e.g. revenue by product line)
+    are dropped too: they share the base period, so keeping them would let a
+    breakdown stand in for the consolidated total in the flat schema. The
+    exception is an EDINET filer with no consolidated statements: its main
+    statements are filed under NonConsolidatedMember contexts.
     """
+    standalone_filer = any(
+        (el.text or "").strip() == "false"
+        for el in root.iter("{*}WhetherConsolidatedFinancialStatementsArePreparedDEI")
+    )
     contexts: dict[str, tuple[date, date]] = {}
     for context in root.iter(f"{{{_XBRLI_NS}}}context"):
         context_id = context.get("id")
         if not context_id:
+            continue
+        is_main_standalone = standalone_filer and context_id.endswith("_NonConsolidatedMember")
+        if _is_dimensional(context) and not is_main_standalone:
             continue
         period_el = context.find(f"{{{_XBRLI_NS}}}period")
         if period_el is None:
@@ -93,6 +111,13 @@ def _resolve_contexts(root: etree._Element) -> dict[str, tuple[date, date]]:
                 contexts[context_id] = (start, end)
 
     return contexts
+
+
+def _is_dimensional(context: etree._Element) -> bool:
+    return (
+        context.find(f".//{{{_XBRLI_NS}}}segment") is not None
+        or context.find(f"{{{_XBRLI_NS}}}scenario") is not None
+    )
 
 
 def _safe_date(value: str) -> date | None:
